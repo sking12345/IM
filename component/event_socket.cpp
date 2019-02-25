@@ -12,7 +12,7 @@ void event_cb(struct bufferevent *bev, short event, void *arg)
 {
 
 }
-int tcp_server_init(int port, int listen_num)
+int tcp_server(int port, int listen_num)
 {
 
 }

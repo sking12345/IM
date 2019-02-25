@@ -7,6 +7,8 @@ using namespace std;
 
 int main()
 {
-	int listener = tcp_server_init(PORT, LISTEN_NUM);
+
+	tcp_server(PORT, LISTEN_NUM);
+
 }
 
