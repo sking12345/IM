@@ -1,5 +1,6 @@
 #include "component/event_socket.h"
 #include <iostream>
+
 using namespace std;
 
 #define PORT 8000
@@ -8,7 +9,8 @@ using namespace std;
 int main()
 {
 
-	tcp_server(PORT, LISTEN_NUM);
 
+	tcp_server_start(PORT, LISTEN_NUM);
+	return 0;
 }
 
