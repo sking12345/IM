@@ -1,5 +1,31 @@
 #include "event_socket.h"
 
+
+
+singleton *singleton::ptr = NULL;
+pthread_mutex_t singleton::mutex;
+
+singleton::singleton()
+{
+	pthread_mutex_init(&mutex, NULL);
+
+
+}
+singleton *singleton::get_instance()
+{
+	if (ptr == NULL)
+	{
+		pthread_mutex_lock(&mutex);
+		if (ptr == NULL)
+		{
+			ptr = new singleton();
+			pthread_mutex_unlock(&mutex);
+		}
+
+	}
+	return ptr;
+}
+
 void accept_cb(int fd, short events, void* arg)
 {
 	evutil_socket_t sockfd;
@@ -11,6 +37,7 @@ void accept_cb(int fd, short events, void* arg)
 	evutil_make_socket_nonblocking(sockfd);
 
 	printf("accept a client %d\n", sockfd);
+
 
 	struct event_base* base = (struct event_base*)arg;
 
@@ -28,7 +55,8 @@ void socket_read_cb(int fd, short events, void *arg)
 	struct event *ev = (struct event*)arg;
 	int len = read(fd, msg, sizeof(msg) - 1);
 
-
+	singleton *s1 = singleton::get_instance();
+	// msg1->test();
 
 	if ( len <= 0 )
 	{
@@ -91,12 +119,15 @@ int tcp_server_start(int port, int listen_num) {
 	{
 		perror("tcp_server_init error");
 	}
-	struct event_base *base = event_base_new();
-	struct event* ev_listen = event_new(base, listener, EV_READ | EV_PERSIST, accept_cb, base);
+
+	struct event_base * base = event_base_new();
+	struct event* ev_listen = event_new(base, listener, EV_READ | EV_PERSIST, accept_cb, (void*)base);
 	event_add(ev_listen, NULL);
 	event_base_dispatch(base);
 	return true;
 }
+
+
 
 
 
