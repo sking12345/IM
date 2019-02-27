@@ -57,15 +57,15 @@ void singleton::read_connect(int cfd, struct data_apk apk)
 	if (apk.status == 0x01) //数据发送完毕
 	{
 		printf("%s\n", "recv ok");
-		map<int, struct apk_list>::iterator iter = this->apk_list_map.find(cfd);
+		map<int, struct apk_list> iter = this->apk_list_map.find(cfd);
 		list<struct data_apk>::iterator itt;
 		// list<struct data_apk>::iterator list_data = iter->second;
-		struct apk_list test = iter->second;
-		// for (itt = test.list.begin(); itt != test.list.begin(); itt++)
-		// {
-		// 	printf("%s\n", "ddd");
-		// 	printf("%d\n", itt->number);
-		// }
+		struct apk_list *test = &iter->second;
+		for (itt = test->list.begin(); itt != test->list.begin(); itt++)
+		{
+			printf("%s\n", "ddd");
+			printf("%d\n", itt->number);
+		}
 	}
 }
 
