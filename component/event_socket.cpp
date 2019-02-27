@@ -44,9 +44,29 @@ void singleton::new_connect(int sfd) {
  * @param sfd [description]
  * @param apk [description]
  */
-void singleton::read_connect(int sfd, struct data_apk *apk)
+void singleton::read_connect(int cfd, struct data_apk apk)
 {
-	printf("%s\n", apk->buf);
+	printf("%s\n", apk.buf);
+	printf("%d\n", apk.number);
+
+	struct apk_list apk_list;
+	apk_list.sockfd = cfd;
+	apk_list.list.push_back(apk);
+	this->apk_list_map.insert(pair<int, struct apk_list>(cfd, apk_list));
+
+	if (apk.status == 0x01) //数据发送完毕
+	{
+		printf("%s\n", "recv ok");
+		map<int, struct apk_list>::iterator iter = this->apk_list_map.find(cfd);
+		list<struct data_apk>::iterator itt;
+		// list<struct data_apk>::iterator list_data = iter->second;
+		struct apk_list test = iter->second;
+		// for (itt = test.list.begin(); itt != test.list.begin(); itt++)
+		// {
+		// 	printf("%s\n", "ddd");
+		// 	printf("%d\n", itt->number);
+		// }
+	}
 }
 
 void singleton::abnormal(int sfd)
@@ -91,7 +111,7 @@ void socket_read_cb(int fd, short events, void *arg)
 		event_free(ev);
 		return ;
 	} else {
-		singleton_obj->read_connect(fd, &apk);
+		singleton_obj->read_connect(fd, apk);
 	}
 }
 

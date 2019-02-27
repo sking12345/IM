@@ -17,24 +17,18 @@ typedef struct data_apk	//数据分包数据
 {
 	uint8 version: 4;   //版本号
 	uint8 s_type: 4;   //服务类型
-	uint8 ttl;  //生存时间
+	uint8 status;	//数据包状态
+	uint32 number;	//数据包编号
+	// uint8 ttl;  //生存时间
 	uint8 buf[APK_SIZE];
 } TCP_APK;
 
 typedef struct apk_list //接受到的数据包数据存入该结构
 {
-	int socket_fd;	//socket 链接
-	int data_size;	//数据大小
-	int apk_num;	// 数据包数量
-	int recv_num;	//接受数量
+	int sockfd;	//socket 链接
 	list<struct data_apk> list;
 } APK_LIST;
 
-typedef struct message
-{
-	int socket_fd;
-	struct apk_list apk_list;
-} MESSAGE;
 
 
 typedef struct connect_list // 记录链接时间,用于心跳检测
@@ -44,3 +38,4 @@ typedef struct connect_list // 记录链接时间,用于心跳检测
 } CONNECT_LIST;
 
 #endif
+

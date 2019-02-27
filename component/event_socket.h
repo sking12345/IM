@@ -31,7 +31,7 @@ public:
 	static pthread_mutex_t mutex;
 	static singleton * get_instance();
 	void new_connect(int sfd);	//信息的连接
-	void read_connect(int sfd, struct data_apk *);
+	void read_connect(int sfd, struct data_apk );
 	void set_listener(int listener_fd);
 	void abnormal(int sfd);	//异常
 
