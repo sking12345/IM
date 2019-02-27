@@ -21,9 +21,37 @@ singleton *singleton::get_instance()
 			ptr = new singleton();
 			pthread_mutex_unlock(&mutex);
 		}
-
 	}
 	return ptr;
+}
+//记录设置监听端口的fd
+void singleton::set_listener(int listener_fd)
+{
+	this->listener_fd = listener_fd;
+}
+/**
+ * [singleton::new_connect 新的客户端连接]
+ * @param sfd [description]
+ */
+void singleton::new_connect(int sfd) {
+	struct connect_list clist;
+	clist.status = false;
+	clist.time = time(NULL);
+	this->client_fd_map.insert(pair<int, struct connect_list>(listener_fd, clist));
+}
+/**
+ * [singleton::read_connect 接收到客户端发送的数据]
+ * @param sfd [description]
+ * @param apk [description]
+ */
+void singleton::read_connect(int sfd, struct data_apk *apk)
+{
+	printf("%s\n", apk->buf);
+}
+
+void singleton::abnormal(int sfd)
+{
+	this->client_fd_map.erase(sfd);	//删除维护客户端的连接
 }
 
 void accept_cb(int fd, short events, void* arg)
@@ -36,7 +64,8 @@ void accept_cb(int fd, short events, void* arg)
 	sockfd = accept(fd, (struct sockaddr*)&client, &len );
 	evutil_make_socket_nonblocking(sockfd);
 
-	printf("accept a client %d\n", sockfd);
+	singleton *singleton_obj = singleton::get_instance();
+	singleton_obj->new_connect(fd);
 
 
 	struct event_base* base = (struct event_base*)arg;
@@ -51,29 +80,19 @@ void accept_cb(int fd, short events, void* arg)
 }
 void socket_read_cb(int fd, short events, void *arg)
 {
-	char msg[4096];
+	struct data_apk apk;
 	struct event *ev = (struct event*)arg;
-	int len = read(fd, msg, sizeof(msg) - 1);
-
-	singleton *s1 = singleton::get_instance();
-	// msg1->test();
-
+	singleton *singleton_obj = singleton::get_instance();
+	int len = read(fd, &apk, sizeof(struct data_apk));
 	if ( len <= 0 )
 	{
-		printf("some error happen when read\n");
+		singleton_obj->abnormal(fd);
 		close(event_get_fd(ev));
 		event_free(ev);
 		return ;
+	} else {
+		singleton_obj->read_connect(fd, &apk);
 	}
-
-	msg[len] = '\0';
-	printf("recv the client msg: %s", msg);
-
-	char reply_msg[4096] = "I have recvieced the msg: ";
-	strcat(reply_msg + strlen(reply_msg), msg);
-
-	write(fd, reply_msg, strlen(reply_msg) );
-
 }
 
 int tcp_server_init(int port, int listen_num)
@@ -119,7 +138,8 @@ int tcp_server_start(int port, int listen_num) {
 	{
 		perror("tcp_server_init error");
 	}
-
+	singleton *singleton_obj = singleton::get_instance();
+	singleton_obj->set_listener(listener);
 	struct event_base * base = event_base_new();
 	struct event* ev_listen = event_new(base, listener, EV_READ | EV_PERSIST, accept_cb, (void*)base);
 	event_add(ev_listen, NULL);
