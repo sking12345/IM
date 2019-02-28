@@ -14,7 +14,7 @@ typedef  unsigned long long uint64;
 
 typedef struct test_apk
 {
-	int test;
+	uint32 test;
 	char buf[2];
 
 } TEST_APK;
@@ -33,7 +33,8 @@ typedef struct data_apk	//数据分包数据
 
 typedef struct apk_list //接受到的数据包数据存入该结构
 {
-	int sockfd;	//socket 链接
+	uint32 sockfd;	//socket 链接
+	uint32 number;	//数据编号
 	list<struct data_apk> list;
 } APK_LIST;
 
@@ -41,7 +42,7 @@ typedef struct apk_list //接受到的数据包数据存入该结构
 
 typedef struct connect_list // 记录链接时间,用于心跳检测
 {
-	int status;	//状态,用于判断是否已通过验证操作
+	uint32 status;	//状态,用于判断是否已通过验证操作
 	time_t time;
 } CONNECT_LIST;
 
