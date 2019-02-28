@@ -4,12 +4,20 @@
 #include <list>
 #include <iostream>
 using namespace std;
-#define APK_SIZE 100
+#define APK_SIZE 1
 
 typedef  unsigned char uint8;
 typedef  unsigned short uint16;
 typedef  unsigned int uint32;
 typedef  unsigned long long uint64;
+
+
+typedef struct test_apk
+{
+	int test;
+	int test1;
+
+} TEST_APK;
 
 
 
@@ -19,7 +27,7 @@ typedef struct data_apk	//数据分包数据
 	uint8 s_type: 4;   //服务类型
 	uint8 status;	//数据包状态
 	uint32 number;	//数据包编号
-	// uint8 ttl;  //生存时间
+	uint32 size;
 	uint8 buf[APK_SIZE];
 } TCP_APK;
 
@@ -37,5 +45,20 @@ typedef struct connect_list // 记录链接时间,用于心跳检测
 	time_t time;
 } CONNECT_LIST;
 
+
+
 #endif
+
+
+
+
+
+
+
+
+
+
+
+
+
 

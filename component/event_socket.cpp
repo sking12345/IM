@@ -1,5 +1,5 @@
 #include "event_socket.h"
-
+#include <string.h>
 
 
 singleton *singleton::ptr = NULL;
@@ -46,32 +46,51 @@ void singleton::new_connect(int sfd) {
  */
 void singleton::read_connect(int cfd, struct data_apk apk)
 {
-	printf("%s\n", apk.buf);
-	printf("%d\n", apk.number);
 
-	struct apk_list apk_list;
-	apk_list.sockfd = cfd;
-	apk_list.list.push_back(apk);
-	this->apk_list_map.insert(pair<int, struct apk_list>(cfd, apk_list));
-
-	if (apk.status == 0x01) //数据发送完毕
+	map<int, struct apk_list>::iterator iter = this->apk_list_map.find(cfd);
+	if (iter == this->apk_list_map.end())
 	{
-		printf("%s\n", "recv ok");
-		map<int, struct apk_list> iter = this->apk_list_map.find(cfd);
-		list<struct data_apk>::iterator itt;
-		// list<struct data_apk>::iterator list_data = iter->second;
-		struct apk_list *test = &iter->second;
-		for (itt = test->list.begin(); itt != test->list.begin(); itt++)
+		struct apk_list apk_list;
+		apk_list.sockfd = cfd;
+		apk_list.list.push_back(apk);
+		this->apk_list_map.insert(pair<int, struct apk_list>(cfd, apk_list));
+	} else {
+		struct apk_list *apk_list = &iter->second;
+		apk_list->list.push_back(apk);
+	}
+	if (apk.status == 0x01)
+	{
+		printf("%d\n", apk.size);
+		char *buf = (char *)malloc(apk.size + 1);
+		memset(buf, 0, apk.size + 1);
+		map<int, struct apk_list>::iterator iter1 =  this->apk_list_map.find(cfd);
+		struct apk_list *apk_list1 = &iter1->second;
+		list<struct data_apk>::iterator iter_list;
+		for (iter_list = apk_list1->list.begin(); iter_list != apk_list1->list.end(); iter_list++)
 		{
-			printf("%s\n", "ddd");
-			printf("%d\n", itt->number);
+
+			// buf[] = iter_list->buf;
+			memcpy(buf + iter_list->number * APK_SIZE, iter_list->buf, 1);
+			//printf("%d --- %s --- \n", iter_list->number * APK_SIZE, iter_list->buf);
+
 		}
+		apk_list1->list.clear();
+		struct test_apk* test_apk = (struct test_apk*)buf;
+		printf("%d\n", test_apk->test);
+		// printf("%s\n", buf );
+		free(buf);
+		buf = NULL;
 	}
 }
 
 void singleton::abnormal(int sfd)
 {
+	map<int, struct apk_list>::iterator iter1 =  this->apk_list_map.find(sfd);
+	struct apk_list *apk_list1 = &iter1->second;
+	apk_list1->list.clear();
+	this->apk_list_map.erase(sfd);
 	this->client_fd_map.erase(sfd);	//删除维护客户端的连接
+	printf("%s\n", "close" );
 }
 
 void accept_cb(int fd, short events, void* arg)
