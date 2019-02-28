@@ -16,7 +16,6 @@ typedef struct test_apk
 {
 	uint32 test;
 	char buf[0];
-
 } TEST_APK;
 
 

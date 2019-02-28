@@ -61,8 +61,6 @@ void singleton::read_connect(int cfd, struct data_apk apk)
 	if (apk.status == 0x01)
 	{
 		printf("%d\n", apk.size);
-
-
 		char *buf = (char *)malloc(apk.size + 1);
 		memset(buf, 0, apk.size + 1);
 		map<int, struct apk_list>::iterator iter1 =  this->apk_list_map.find(cfd);
