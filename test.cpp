@@ -31,13 +31,13 @@ int main(int argc, char *argv[])
     //3.链接服务器
     connect(confd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
 
-    const char*str1 = "asdkxkxk";
+    const char*str1 = "asdkxkxk1123xxxddd";
 
     struct data_apk apk;
 
     struct test_apk* test_apk = (struct test_apk*)malloc(sizeof(struct test_apk) + strlen(str1) + 1);
     memset(test_apk, 0x00, sizeof(struct test_apk) + strlen(str1) + 1);
-    test_apk->test = 10;
+    test_apk->test = 100;
     memcpy(test_apk->buf, str1, strlen(str1));
     // printf("%ld\n", sizeof(struct test_apk) + strlen(str1));
     printf("%s\n", test_apk->buf);
