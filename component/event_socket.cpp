@@ -61,25 +61,36 @@ void singleton::read_connect(int cfd, struct data_apk apk)
 	if (apk.status == 0x01)
 	{
 		printf("%d\n", apk.size);
-		char *buf = (char *)malloc(apk.size + 1);
-		memset(buf, 0, apk.size + 1);
+
+
+
+		char *buf = (char *)malloc(apk.size);
+		memset(buf, 0, apk.size );
 		map<int, struct apk_list>::iterator iter1 =  this->apk_list_map.find(cfd);
 		struct apk_list *apk_list1 = &iter1->second;
 		list<struct data_apk>::iterator iter_list;
 		for (iter_list = apk_list1->list.begin(); iter_list != apk_list1->list.end(); iter_list++)
 		{
 
-			// buf[] = iter_list->buf;
 			memcpy(buf + iter_list->number * APK_SIZE, iter_list->buf, 1);
-			//printf("%d --- %s --- \n", iter_list->number * APK_SIZE, iter_list->buf);
+
+
 
 		}
+		// struct test_apk* tsk_apk = (struct test_apk*)buf;
+		struct test_apk* tsk_apk = (struct test_apk*)malloc(apk.size);
+		tsk_apk = (struct test_apk*)buf;
+
+		printf("%d -- %s\n", tsk_apk->test, tsk_apk->buf);
 		apk_list1->list.clear();
-		struct test_apk* test_apk = (struct test_apk*)buf;
-		printf("%s\n", test_apk->buf);
+		// printf("%d----%s\n", tsk_apk->test, "xx");
+		free(tsk_apk);
+		tsk_apk = NULL;
+		// printf("%d\n", test_apk->test);
+
 		// printf("%s\n", buf );
-		free(buf);
-		buf = NULL;
+		// free(buf);
+		// buf = NULL;
 	}
 }
 

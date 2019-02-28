@@ -31,34 +31,42 @@ int main(int argc, char *argv[])
     //3.链接服务器
     connect(confd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
 
-    const char*str1 = "asdddksfjasfxxx";
+    const char*str1 = "asdkxkxk";
 
     struct data_apk apk;
 
-    struct test_apk test_apk;
-    test_apk.test = 10;
-    memset(test_apk.buf, 0x00, sizeof(test_apk.buf));
-    memcpy(test_apk.buf, "dd", 2);
+    struct test_apk* test_apk = (struct test_apk*)malloc(sizeof(struct test_apk) + strlen(str1) + 1);
+    memset(test_apk, 0x00, sizeof(struct test_apk) + strlen(str1) + 1);
+    test_apk->test = 10;
+    memcpy(test_apk->buf, str1, strlen(str1));
+    // printf("%ld\n", sizeof(struct test_apk) + strlen(str1));
+    printf("%s\n", test_apk->buf);
+
+    // memset(test_apk.buf, 0x00, sizeof(test_apk.buf));
+    // memcpy(test_apk.buf, "dd", 2);
 
     // char * tt = (char *)&test_apk;
     // printf("%ld\n", sizeof(struct test_apk));
 
 
-    apk.size = sizeof(struct test_apk);
+    apk.size = sizeof(struct test_apk) + strlen(str1) ;
     int count = apk.size / APK_SIZE;
     for (int i = 0; i < count; i++)
     {
         apk.number = i;
         memset(apk.buf, 0x00, sizeof(apk.buf));
-        memcpy(apk.buf, (char*)&test_apk + i * APK_SIZE, APK_SIZE);
+        memcpy(apk.buf, (char*)test_apk + i * APK_SIZE, APK_SIZE);
         if (i == count - 1)
         {
             apk.status = 0x01;
         } else {
             apk.status = 0x00;
         }
+        printf("%d---%s\n",  i * APK_SIZE, apk.buf);
         write(confd, &apk, sizeof(apk));
     }
+    free(test_apk);
+    test_apk = NULL;
     // memset(apk.buf, 0x00, sizeof(apk.buf));
     // memcpy(apk.buf, "ddd", 3);
 
