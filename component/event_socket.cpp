@@ -76,7 +76,7 @@ void singleton::read_connect(int cfd, struct data_apk apk)
 		}
 		apk_list1->list.clear();
 		struct test_apk* test_apk = (struct test_apk*)buf;
-		printf("%d\n", test_apk->test);
+		printf("%s\n", test_apk->buf);
 		// printf("%s\n", buf );
 		free(buf);
 		buf = NULL;

@@ -15,7 +15,7 @@ typedef  unsigned long long uint64;
 typedef struct test_apk
 {
 	int test;
-	int test1;
+	char buf[2];
 
 } TEST_APK;
 

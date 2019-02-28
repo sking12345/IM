@@ -37,7 +37,8 @@ int main(int argc, char *argv[])
 
     struct test_apk test_apk;
     test_apk.test = 10;
-    test_apk.test1 = 20;
+    memset(test_apk.buf, 0x00, sizeof(test_apk.buf));
+    memcpy(test_apk.buf, "dd", 2);
 
     // char * tt = (char *)&test_apk;
     // printf("%ld\n", sizeof(struct test_apk));
