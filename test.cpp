@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include<errno.h>
 #include <string.h>
 #include "component/type.h"
 #define SERVER_PORT 8000
@@ -42,15 +43,21 @@ int main(int argc, char *argv[])
     // printf("%ld\n", sizeof(struct test_apk) + strlen(str1));
     printf("%s\n", test_apk->buf);
 
+    int opt;
+    socklen_t len1 = sizeof(int);
+    if ((getsockopt(confd, SOL_SOCKET, SO_SNDBUF, (char*)&opt, &len1)) == 0) {
+        printf("SO_KEEPALIVE Value: %d/n", opt);
+    }
+
     // memset(test_apk.buf, 0x00, sizeof(test_apk.buf));
     // memcpy(test_apk.buf, "dd", 2);
 
     // char * tt = (char *)&test_apk;
     // printf("%ld\n", sizeof(struct test_apk));
 
-
     apk.size = sizeof(struct test_apk) + strlen(str1) ;
     int count = apk.size / APK_SIZE;
+    int iResult = 0;
     for (int i = 0; i < count; i++)
     {
         apk.number = i;
@@ -63,7 +70,9 @@ int main(int argc, char *argv[])
             apk.status = 0x00;
         }
         printf("%d---%s\n",  i * APK_SIZE, apk.buf);
-        write(confd, &apk, sizeof(apk));
+        // write(confd, &apk, sizeof(apk));
+        iResult = send(confd, &apk, sizeof(apk), 0);
+
     }
     free(test_apk);
     test_apk = NULL;

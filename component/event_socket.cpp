@@ -89,11 +89,11 @@ void singleton::read_connect(int cfd, struct data_apk apk)
 
 void singleton::abnormal(int sfd)
 {
-	map<int, struct apk_list>::iterator iter1 =  this->apk_list_map.find(sfd);
-	struct apk_list *apk_list1 = &iter1->second;
-	apk_list1->list.clear();
-	this->apk_list_map.erase(sfd);
-	this->client_fd_map.erase(sfd);	//删除维护客户端的连接
+	// map<int, struct apk_list>::iterator iter1 =  this->apk_list_map.find(sfd);
+	// struct apk_list *apk_list1 = &iter1->second;
+	// apk_list1->list.clear();
+	// this->apk_list_map.erase(sfd);
+	// this->client_fd_map.erase(sfd);	//删除维护客户端的连接
 	printf("%s\n", "close" );
 }
 
