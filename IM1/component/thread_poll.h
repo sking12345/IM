@@ -38,7 +38,52 @@ typedef struct thread_poll   //线程池队列
 	int thread_num;		//线程数
 } thread_poll_t;
 
+/**
+ * [thread_pool_init 初始化]
+ * @param  thread_num    [线程数目]
+ * @param  queue_max_num [最大任务个数]
+ * @return              成功：线程池地址 失败：NULL
+ */
+struct thread_poll* thread_pool_init(int thread_num, int queue_max_num);
+
+/**
+ * [threadpool_add_job 初始化]
+ * @param  thread_poll    [thread_pool_init 初始化返回的值]
+ *     [in] callback_function     回调函数
+       [in] arg                     回调函数参数
+ * @param  queue_max_num [最大任务个数]
+ * @return             成功:1 失败:-1
+ */
+
+int threadpool_add_job(struct thread_poll* thread_poll, void* (*callback_function)(void *arg), void *arg);
+
+/**
+ * [threadpool_destroy 销毁线程池]
+ * @param  pool    [线程数目]
+ * @return               [description]
+ */
+int threadpool_destroy(struct threadpool *pool);	//
+
+
+/**
+ * [threadpool_function  线程池中线程函数]
+ * @param arg [线程地址]
+ */
+void* threadpool_function(void* arg); // 线程池中线程函数
+
+
+
 #endif
+
+
+
+
+
+
+
+
+
+
 
 
 
