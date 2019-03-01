@@ -62,7 +62,13 @@ int main(int argc, char *argv[])
     {
         apk.number = i;
         memset(apk.buf, 0x00, sizeof(apk.buf));
-        memcpy(apk.buf, (char*)test_apk + i * APK_SIZE, APK_SIZE);
+        if (i * APK_SIZE + APK_SIZE < apk.size)
+        {
+            memcpy(apk.buf, (char*)test_apk + i * APK_SIZE, APK_SIZE);
+        } else {
+            int opt = i * APK_SIZE;
+            memcpy(apk.buf, (char*)test_apk + opt, apk.size - opt);
+        }
         if (i == count - 1)
         {
             apk.status = 0x01;

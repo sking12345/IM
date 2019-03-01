@@ -10,10 +10,12 @@ using namespace std;
 
 class msg: public message_base
 {
-public:
+public: 
 	void new_message(int fd, void *buf)
 	{
 		printf("%s\n", "ddd");
+		const char * str = "ddd";
+		socket_send(fd,str,3);
 	}
 	void socket_abnormal(int fd)
 	{

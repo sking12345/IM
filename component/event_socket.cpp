@@ -68,7 +68,7 @@ void singleton::read_connect(int cfd, struct data_apk apk)
 		list<struct data_apk>::iterator iter_list;
 		for (iter_list = apk_list1->list.begin(); iter_list != apk_list1->list.end(); iter_list++)
 		{
-			memcpy(buf + iter_list->number * APK_SIZE, iter_list->buf, 1);
+			memcpy(buf + iter_list->number * APK_SIZE, iter_list->buf, APK_SIZE);
 		}
 		// struct test_apk* tsk_apk = (struct test_apk*)buf;
 		struct test_apk* tsk_apk = NULL;

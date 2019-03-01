@@ -4,7 +4,7 @@
 #include <list>
 #include <iostream>
 using namespace std;
-#define APK_SIZE 1
+#define APK_SIZE 5
 
 typedef  unsigned char uint8;
 typedef  unsigned short uint16;
@@ -27,7 +27,7 @@ typedef struct data_apk	//数据分包数据
 	uint8 status;	//数据包状态
 	uint32 number;	//数据包编号
 	uint32 size;
-	uint8 buf[APK_SIZE];
+	uint8 buf[APK_SIZE + 1];
 } TCP_APK;
 
 typedef struct apk_list //接受到的数据包数据存入该结构

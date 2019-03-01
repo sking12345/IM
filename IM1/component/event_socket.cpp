@@ -42,6 +42,15 @@ void socket_read_cb(int fd, short events, void *arg)
 	}
 }
 
+void socket_send(int fd,const char *buf,int size)
+{
+	//event_sockt *event_sockt_obj = event_sockt::get_instance();
+	//做线程池,将数据发到线程池中,然后触发
+
+}
+
+
+
 int tcp_server_init(int port, int listen_num)
 {
 	int errno_save;
@@ -65,7 +74,6 @@ int tcp_server_init(int port, int listen_num)
 	if ( listen(listener, listen_num) < 0)
 		goto error;
 
-
 	//跨平台统一接口，将套接字设置为非阻塞状态
 	evutil_make_socket_nonblocking(listener);
 
@@ -83,16 +91,25 @@ int tcp_server_start(int port, int listen_num, message_base* msg_obj) {
 	int listener = tcp_server_init(port, listen_num);
 	if (listener == -1)
 	{
-		perror("tcp_server_init error");
+		printf("tcp_server_init error");
 	}
 	event_sockt *event_sockt_obj = event_sockt::get_instance();
-	if (msg_obj == NULL)
-	{
-		event_sockt_obj->set_msg_obj(new message_base());
-	} else {
+	#if DEBUG == 0x01
+		if (msg_obj == NULL)
+		{
+			event_sockt_obj->set_msg_obj(new message_base());
+		} else {
+			event_sockt_obj->set_msg_obj(msg_obj);
+		}
+	#else
+		if(msg_obj == NULL)
+		{
+			printf("error: tcp_server_start Missing message_base object\n");
+			return false;
+		}
 		event_sockt_obj->set_msg_obj(msg_obj);
-	}
-
+	#endif
+	
 	event_sockt_obj->set_listener(listener);
 	struct event_base * base = event_base_new();
 	struct event* ev_listen = event_new(base, listener, EV_READ | EV_PERSIST, accept_cb, (void*)base);
@@ -130,11 +147,10 @@ event_sockt *event_sockt::get_instance()
 
 void event_sockt::new_connect(int listener_fd, struct sockaddr_in* client)
 {
-	event_sockt *event_sockt_obj = event_sockt::get_instance();
-	message_base * msg_obj = event_sockt_obj->get_msg_obj();
 
-	msg_obj->new_message(1, NULL);
-	printf("%s\n", "new cfd");
+	#if DEBUG == 0x01
+		printf("%s\n", "new cfd");
+	#endif
 	struct fds_list cfd_list;
 	cfd_list.status = false;
 	cfd_list.time = time(NULL);
@@ -157,7 +173,7 @@ void event_sockt::read_connect(int cfd, struct data_apk apk)
 	{
 		printf("%d\n", apk.size);
 		char *buf = (char *)malloc(apk.size + 1);
-		memset(buf, 0, apk.size + 1);
+		memset(buf, 0x00, apk.size + 1);
 		map<int, struct apk_list>::iterator iter1 =  this->apk_list_map.find(cfd);
 		struct apk_list *apk_list1 = &iter1->second;
 		list<struct data_apk>::iterator iter_list;
@@ -166,6 +182,9 @@ void event_sockt::read_connect(int cfd, struct data_apk apk)
 			memcpy(buf + iter_list->number * APK_SIZE, iter_list->buf, 1);
 		}
 		apk_list1->list.clear();
+		event_sockt *event_sockt_obj = event_sockt::get_instance();
+		message_base * msg_obj = event_sockt_obj->get_msg_obj();
+		msg_obj->new_message(1, buf);
 		free(buf);
 		buf = NULL;
 	}

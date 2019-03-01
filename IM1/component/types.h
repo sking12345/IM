@@ -5,7 +5,7 @@
 #include <list>
 #include <iostream>
 using namespace std;
-
+#define DEBUG 0x00
 #define APK_SIZE 1
 
 
@@ -26,7 +26,7 @@ typedef struct  data_apk	// 定义传输基本数据结构
 	uint8 status;	//状态
 	uint32 number;	//编号
 	uint32 size;	//数据总大小
-	uint8 buf[APK_SIZE];	//数据
+	uint8 buf[APK_SIZE + 1];	//数据
 } DATA_APK;
 
 typedef struct apk_list //接受到的数据包数据存入该结构
@@ -41,6 +41,13 @@ typedef struct fds_list // 记录链接时间,用于心跳检测
 	uint32 status;	//状态,用于判断是否已通过验证操作
 	time_t time;
 } CONNECT_LIST;
+
+typedef struct  msg_buf	//数据
+{
+	uint32 size;	//数据大小
+	uint32 number;	//编号
+	int8 data[0];
+}MSG_BUF;
 
 
 #endif

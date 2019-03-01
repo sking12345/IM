@@ -23,6 +23,7 @@ void accept_cb(int fd, short events, void* arg);
 void socket_read_cb(int fd, short events, void *arg);
 int tcp_server_init(int port, int listen_num);
 int tcp_server_start(int port, int listen_num, message_base*);
+void socket_send(int fd,const char *buf,int size);
 
 
 
@@ -34,6 +35,7 @@ private:
 	static event_sockt * ptr;
 	map <int, struct apk_list> apk_list_map;
 	map <int, struct fds_list> fds_list;
+
 	int listener_fd;	//socket
 	struct event* ev_listen;
 	message_base* msg_obj;
