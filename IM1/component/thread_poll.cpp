@@ -3,15 +3,15 @@
 
 struct thread_pool* thread_pool_init(int thread_num, int queue_max_num)
 {
-	printf("%d\n", thread_num);
 
 	struct thread_pool * pool = (thread_pool_t*)malloc(sizeof(thread_pool_t));
 	if (pool == NULL)
 	{
 		return NULL;
 	}
+	pool->thread_num = thread_num;
 	pool->thread_queue = (struct thread*)malloc(sizeof(struct thread) * thread_num);
-	for (int i = 0; i < thread_num; ++i)
+	for (int i = 0; i < thread_num; i++)
 	{
 		pool->thread_queue[i].queue_max_num = queue_max_num;
 		pool->thread_queue[i].head = NULL;
@@ -19,6 +19,7 @@ struct thread_pool* thread_pool_init(int thread_num, int queue_max_num)
 		pool->thread_queue[i].queue_cur_num = 0;
 		pool->thread_queue[i].queue_close = 0;
 		pool->thread_queue[i].pool_close = 0;
+		pool->thread_queue[i].number = i;
 		if (pthread_mutex_init(&(pool->thread_queue[i].mutex), NULL))
 		{
 			printf("failed to init mutex!\n");
@@ -37,20 +38,19 @@ struct thread_pool* thread_pool_init(int thread_num, int queue_max_num)
 
 int thread_pool_add_job(struct thread_pool* thread_pool, void* (*callback_function)(void *arg), void *arg)
 {
-
 	assert(thread_pool != NULL);
 	assert(callback_function != NULL);
 	assert(arg != NULL);
 	struct thread *thread = &(thread_pool->thread_queue[0]);
-	for (int i = 1; i < thread_pool->thread_num; ++i)
+	for (int i = 0; i < thread_pool->thread_num; ++i)
 	{
 		if (thread_pool->thread_queue[i].queue_cur_num < thread->queue_cur_num)
 		{
 			thread = &(thread_pool->thread_queue[i]);
 		}
+
 	}
 	pthread_mutex_lock(&(thread->mutex));
-
 	if (thread->queue_max_num <= thread->queue_cur_num)
 	{
 		printf("%s\n", "queue_max_num <= queue_cur_num");
@@ -82,6 +82,11 @@ int thread_pool_add_job(struct thread_pool* thread_pool, void* (*callback_functi
 int thread_pool_destroy(struct thread_pool *pool)
 {
 	assert(pool != NULL);
+	for (int i = 0; i < pool->thread_num; i++)
+	{
+
+	}
+
 	return 0;
 }
 
@@ -96,7 +101,6 @@ void* thread_pool_function(void* arg) {
 		{
 			pthread_cond_wait(&(thread->cond), &(thread->mutex));
 		}
-		printf("%s\n", "xxdd" );
 		if (thread->pool_close)   //线程池关闭，线程就退出
 		{
 			pthread_mutex_unlock(&(thread->mutex));

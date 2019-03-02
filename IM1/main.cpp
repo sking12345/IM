@@ -37,13 +37,13 @@ int main()
 	// message_base *base = new msg();
 	// tcp_server_start(PORT, LISTEN_NUM, base);
 	//
-	struct thread_pool* pool = thread_pool_init(1, 10);
+	struct thread_pool* pool = thread_pool_init(2, 10);
 	thread_pool_add_job(pool, work, (void*)"1");
-	// threadpool_add_job(pool, work, "2");
-	// threadpool_add_job(pool, work, "3");
-	// threadpool_add_job(pool, work, "4");
-	// threadpool_add_job(pool, work, "5");
-	// threadpool_add_job(pool, work, "6");
+	thread_pool_add_job(pool, work, (void*)"2");
+	thread_pool_add_job(pool, work, (void*)"3");
+	thread_pool_add_job(pool, work, (void*)"4");
+	thread_pool_add_job(pool, work, (void*)"5");
+	thread_pool_add_job(pool, work, (void*)"6");
 	// threadpool_add_job(pool, work, "7");
 	sleep(5);
 	thread_pool_destroy(pool);

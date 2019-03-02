@@ -24,6 +24,7 @@ typedef struct thread_job
 
 typedef struct thread
 {
+
 	pthread_t    tid;	//现场ID
 	int          queue_max_num;
 	struct thread_job *head;
@@ -33,6 +34,7 @@ typedef struct thread
 	int queue_cur_num;                //队列当前的job个数
 	int queue_close;                  //队列是否已经关闭
 	int pool_close;                   //线程池是否已经关闭
+	int number;	//线程编号
 } thread_t;
 
 typedef struct thread_pool  //线程池队列
