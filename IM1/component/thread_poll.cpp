@@ -84,10 +84,27 @@ int thread_pool_destroy(struct thread_pool **pool)
 	assert(*pool != NULL);
 	for (int i = 0; i < (*pool)->thread_num; i++)
 	{
-		free((*pool)->thread_queue);
-		(*pool)->thread_queue = NULL;
-
+		struct thread *thread = &((*pool)->thread_queue[i]);
+		pthread_mutex_lock(&(thread->mutex));
+		if (thread->queue_close || thread->pool_close)
+		{
+			pthread_mutex_unlock(&(thread->mutex));
+			return -1;
+		}
+		thread->queue_close = 1;
+		while (thread->queue_cur_num != 0)
+		{
+			pthread_cond_wait(&(thread->cond), &(thread->mutex));  //等待队列为空
+		}
+		thread->pool_close = 1;
+		pthread_mutex_unlock(&(thread->mutex));
+		pthread_cond_signal(&(thread->cond));
+		pthread_join(thread->tid, NULL);
+		pthread_mutex_destroy(&(thread->mutex));
+		pthread_cond_destroy(&(thread->cond));
 	}
+	free((*pool)->thread_queue);
+	(*pool)->thread_queue = NULL;
 	free(*pool);
 	*pool = NULL;
 	return 0;
@@ -126,6 +143,10 @@ void* thread_pool_function(void* arg) {
 	}
 	return NULL;
 }
+
+
+
+
 
 
 

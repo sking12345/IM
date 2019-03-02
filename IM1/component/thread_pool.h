@@ -52,6 +52,10 @@ typedef struct thread_pool  //线程池队列
 struct thread_pool* thread_pool_init(int thread_num, int queue_max_num);
 
 /**
+ * 线程池销毁时是否立即关闭线程
+ */
+void set_destroy_stop(struct thread_pool*);
+/**
  * [threadpool_add_job 初始化]
  * @param  thread_pool   [thread_pool_init 初始化返回的值]
  *     [in] callback_function     回调函数
