@@ -79,14 +79,17 @@ int thread_pool_add_job(struct thread_pool* thread_pool, void* (*callback_functi
 	return 0;
 }
 
-int thread_pool_destroy(struct thread_pool *pool)
+int thread_pool_destroy(struct thread_pool **pool)
 {
-	assert(pool != NULL);
-	for (int i = 0; i < pool->thread_num; i++)
+	assert(*pool != NULL);
+	for (int i = 0; i < (*pool)->thread_num; i++)
 	{
+		free((*pool)->thread_queue);
+		(*pool)->thread_queue = NULL;
 
 	}
-
+	free(*pool);
+	*pool = NULL;
 	return 0;
 }
 

@@ -67,7 +67,7 @@ int thread_pool_add_job(struct thread_pool* pool, void* (*callback_function)(voi
  * @param  pool    [线程数目]
  * @return               [description]
  */
-int thread_pool_destroy(struct thread_pool *pool);	//
+int thread_pool_destroy(struct thread_pool **pool);	//
 
 
 /**

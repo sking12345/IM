@@ -46,7 +46,7 @@ int main()
 	thread_pool_add_job(pool, work, (void*)"6");
 	// threadpool_add_job(pool, work, "7");
 	sleep(5);
-	thread_pool_destroy(pool);
+	thread_pool_destroy(&pool);
 	return 0;
 }
 
