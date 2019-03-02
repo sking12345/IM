@@ -2,6 +2,10 @@
 #define THREAD_POLL_H
 
 #include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+
 
 /**
  * 线程池操作,无锁线程池
@@ -13,30 +17,29 @@
 
 typedef struct thread_job
 {
-	void               (*routine)(void *);
+	void* (*callback_function)(void *arg);
 	void                *arg;
-	struct tpool_work   *next;
+	struct thread_job   *next;
 } thread_job_t;
 
 typedef struct thread
 {
-	pthread_t    id;	//现场ID
+	pthread_t    tid;	//现场ID
 	int          queue_max_num;
 	struct thread_job *head;
+	struct thread_job *tail;
 	pthread_mutex_t mutex;
-	pthread_cond_t queue_empty;
-	pthread_cond_t queue_not_empty;
-	pthread_cond_t queue_not_full;
+	pthread_cond_t cond;
 	int queue_cur_num;                //队列当前的job个数
 	int queue_close;                  //队列是否已经关闭
 	int pool_close;                   //线程池是否已经关闭
 } thread_t;
 
-typedef struct thread_poll   //线程池队列
+typedef struct thread_pool  //线程池队列
 {
-	struct thread * thread;	//线程池
+	struct thread * thread_queue;	//线程池
 	int thread_num;		//线程数
-} thread_poll_t;
+} thread_pool_t;
 
 /**
  * [thread_pool_init 初始化]
@@ -44,32 +47,32 @@ typedef struct thread_poll   //线程池队列
  * @param  queue_max_num [最大任务个数]
  * @return              成功：线程池地址 失败：NULL
  */
-struct thread_poll* thread_pool_init(int thread_num, int queue_max_num);
+struct thread_pool* thread_pool_init(int thread_num, int queue_max_num);
 
 /**
  * [threadpool_add_job 初始化]
- * @param  thread_poll    [thread_pool_init 初始化返回的值]
+ * @param  thread_pool   [thread_pool_init 初始化返回的值]
  *     [in] callback_function     回调函数
        [in] arg                     回调函数参数
  * @param  queue_max_num [最大任务个数]
  * @return             成功:1 失败:-1
  */
 
-int threadpool_add_job(struct thread_poll* thread_poll, void* (*callback_function)(void *arg), void *arg);
+int thread_pool_add_job(struct thread_pool* pool, void* (*callback_function)(void *arg), void *arg);
 
 /**
  * [threadpool_destroy 销毁线程池]
  * @param  pool    [线程数目]
  * @return               [description]
  */
-int threadpool_destroy(struct threadpool *pool);	//
+int thread_pool_destroy(struct thread_pool *pool);	//
 
 
 /**
  * [threadpool_function  线程池中线程函数]
  * @param arg [线程地址]
  */
-void* threadpool_function(void* arg); // 线程池中线程函数
+void* thread_pool_function(void* arg); // 线程池中线程函数
 
 
 
