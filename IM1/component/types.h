@@ -19,6 +19,19 @@ typedef  short int16;
 typedef  int int32;
 typedef  long long int64;
 
+typedef struct test_apk
+{
+	uint32 test;
+	char buf[0];
+} TEST_APK;
+
+typedef struct send_buf
+{
+	int socket_fd;
+	int size;
+	char buf[0];
+} send_buf_t;
+
 typedef struct  data_apk	// 定义传输基本数据结构
 {
 	uint8 version;	//版本
@@ -41,13 +54,6 @@ typedef struct fds_list // 记录链接时间,用于心跳检测
 	uint32 status;	//状态,用于判断是否已通过验证操作
 	time_t time;
 } fds_list_t;
-
-typedef struct  msg_buf	//数据
-{
-	uint32 size;	//数据大小
-	uint32 number;	//编号
-	int8 data[0];
-} msg_buf_t;
 
 
 #endif

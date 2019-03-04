@@ -35,6 +35,11 @@ struct thread_pool* thread_pool_init(int thread_num, int queue_max_num)
 	return pool;
 }
 
+void set_destroy_stop(struct thread_pool* pool)
+{
+	pool->destroy_type = 0x01;
+
+}
 
 int thread_pool_add_job(struct thread_pool* thread_pool, void* (*callback_function)(void *arg), void *arg)
 {
@@ -92,9 +97,14 @@ int thread_pool_destroy(struct thread_pool **pool)
 			return -1;
 		}
 		thread->queue_close = 1;
-		while (thread->queue_cur_num != 0)
+		if ((*pool)->destroy_type != 0x01)
 		{
-			pthread_cond_wait(&(thread->cond), &(thread->mutex));  //等待队列为空
+			thread->pool_close = 1;
+		} else {
+			while (thread->queue_cur_num != 0)
+			{
+				pthread_cond_wait(&(thread->cond), &(thread->mutex));  //等待队列为空
+			}
 		}
 		thread->pool_close = 1;
 		pthread_mutex_unlock(&(thread->mutex));
@@ -123,6 +133,19 @@ void* thread_pool_function(void* arg) {
 		}
 		if (thread->pool_close)   //线程池关闭，线程就退出
 		{
+			if (thread->queue_cur_num > 0)
+			{
+				struct thread_job *node = NULL;
+				pjob = thread->head;
+				while (pjob != NULL)
+				{
+					node = pjob;
+					pjob = pjob->next;
+					free(node);
+					node = NULL;
+				}
+				thread->head = thread->tail = NULL;
+			}
 			pthread_mutex_unlock(&(thread->mutex));
 			pthread_exit(NULL);
 		}

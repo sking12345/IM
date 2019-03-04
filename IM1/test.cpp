@@ -1,128 +1,107 @@
-
-#include <pthread.h>
+#include <netinet/in.h>
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <string.h>
 #include <stdlib.h>
-#include <assert.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include<errno.h>
+#include <string.h>
+#include "component/types.h"
+#define SERVER_PORT 8000
 
-#include <iostream>
-
-using namespace std;
-
-
-typedef struct thread_job
+int main(int argc, char *argv[])
 {
-	void* (*callback_function)(void *arg);
-	void                *arg;
-	struct thread_job   *next;
-} thread_job_t;
+    struct sockaddr_in serveraddr;
+    int confd, len;
+    char ipstr[] = "127.0.0.1";
 
-typedef struct thread
-{
-	pthread_t    tid;	//现场ID
-	int          queue_max_num;
-	struct thread_job *head;
-	struct thread_job *tail;
-	pthread_mutex_t mutex;
-	pthread_cond_t cond;
-	int queue_cur_num;                //队列当前的job个数
-	int queue_close;                  //队列是否已经关闭
-	int pool_close;                   //线程池是否已经关闭
-} thread_t;
 
-typedef struct thread_pool  //线程池队列
-{
-	struct thread *thread_queue;	//线程池
-	int thread_num;		//线程数
-} thread_pool_t;
 
-void* thread_pool_function(void* arg)
-{
-	struct thread *thread = (struct thread*)arg;
-	struct thread_job *pjob = NULL;
-	while (1)
-	{
-		pthread_mutex_lock(&(thread->mutex));
-		if (thread->queue_cur_num == 0)
-		{
-			pthread_cond_wait(&(thread->cond), &(thread->mutex));
-		}
-		printf("%s\n", "ddd");
-		thread->queue_cur_num--;
-		pthread_mutex_unlock(&(thread->mutex));
-	}
-	return NULL;
+    //1.创建一个socket
+    confd = socket(AF_INET, SOCK_STREAM, 0);
+    //2.初始化服务器地址
+    bzero(&serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    //"192.168.6.254"
+    inet_pton(AF_INET, ipstr, &serveraddr.sin_addr.s_addr);
+    serveraddr.sin_port  = htons(SERVER_PORT);
+    //3.链接服务器
+    connect(confd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
+
+    const char*str1 = "asdkxkxk1123xxxddd";
+
+    struct data_apk apk;
+
+    struct test_apk* test_apk = (struct test_apk*)malloc(sizeof(struct test_apk) + strlen(str1) + 1);
+    memset(test_apk, 0x00, sizeof(struct test_apk) + strlen(str1) + 1);
+    test_apk->test = 100;
+    memcpy(test_apk->buf, str1, strlen(str1));
+
+    printf("%s\n", test_apk->buf);
+
+    int opt;
+    socklen_t len1 = sizeof(int);
+    if ((getsockopt(confd, SOL_SOCKET, SO_SNDBUF, (char*)&opt, &len1)) == 0) {
+        printf("SO_KEEPALIVE Value: %d/n", opt);
+    }
+    apk.size = sizeof(struct test_apk) + strlen(str1) ;
+    int count = apk.size / APK_SIZE;
+    int iResult = 0;
+    for (int i = 0; i < count; i++)
+    {
+        apk.number = i;
+        memset(apk.buf, 0x00, sizeof(apk.buf));
+        if (i * APK_SIZE + APK_SIZE < apk.size)
+        {
+            memcpy(apk.buf, (char*)test_apk + i * APK_SIZE, APK_SIZE);
+        } else {
+            int opt = i * APK_SIZE;
+            memcpy(apk.buf, (char*)test_apk + opt, apk.size - opt);
+        }
+        if (i == count - 1)
+        {
+            apk.status = 0x01;
+        } else {
+            apk.status = 0x00;
+        }
+        write(confd, &apk, sizeof(apk));
+        // iResult = send(confd, &apk, sizeof(apk), 0);
+
+    }
+    free(test_apk);
+    test_apk = NULL;
+
+    char *buf = NULL;
+    while (1)
+    {   struct data_apk apk;
+        int len = read(confd, &apk, sizeof(struct data_apk));
+        if (buf == NULL)
+        {
+            buf = (char*)malloc(apk.size + sizeof(struct send_buf) + 1);
+            memset(buf, 0x00, apk.size + sizeof(struct send_buf) + 1);
+        }
+
+        memcpy(buf + apk.number * APK_SIZE, apk.buf, APK_SIZE);
+        if (len <= 0)
+        {
+            printf("error:\n");
+            break;
+        }
+        if (apk.status == 0x01)
+        {
+            struct send_buf *send_buf = ( struct send_buf*)buf;
+            printf("%s\n", send_buf->buf);
+        }
+
+    }
+    //5.关闭socket
+    close(confd);
+    return 0;
 }
-
-
-struct thread_pool* thread_pool_init(int thread_num, int queue_max_num)
-{
-	struct thread_pool* poll = (struct thread_pool*)malloc(sizeof(struct thread_pool));
-	poll->thread_num = thread_num;
-	poll->thread_queue = (struct thread *)malloc(sizeof(struct thread));
-	for (int i = 0; i < thread_num; ++i)
-	{
-		poll->thread_queue[i].queue_max_num = queue_max_num;
-		poll->thread_queue[i].queue_cur_num = 0;
-		poll->thread_queue[i].head = NULL;
-		poll->thread_queue[i].tail = NULL;
-		if (pthread_mutex_init(&(poll->thread_queue[i].mutex), NULL))
-		{
-			printf("failed to init mutex!\n");
-			break;
-		}
-		if (pthread_cond_init(&(poll->thread_queue[i].cond), NULL))
-		{
-			printf("failed to init queue_empty!\n");
-			break;
-		}
-		poll->thread_queue[i].queue_close = 0;
-		poll->thread_queue[i].pool_close = 0;
-		pthread_create(&(poll->thread_queue[i].tid), NULL, thread_pool_function, (void *)&poll->thread_queue[i]);
-	}
-	return poll;
-}
-
-int thread_pool_add_job(struct thread_pool* pool, void* (*callback_function)(void *arg), void *arg)
-{
-	for (int i = 0; i < pool->thread_num; ++i)
-	{
-		struct thread *thread = &(pool->thread_queue[i]);
-		thread->queue_cur_num++;
-		pthread_cond_signal(&(thread->cond));
-	}
-	return 0;
-}
-
-
-int thread_pool_destroy(struct thread_pool *pool)
-{
-	return 0;
-}
-
-void* work(void* arg)
-{
-	char *p = (char*) arg;
-	printf("threadpool callback fuction : %s.\n", p);
-	return NULL;
-}
-
-
-int main()
-{
-	struct thread_pool* poll = thread_pool_init(1, 10);
-	thread_pool_add_job(poll, work, (void*)"1");
-	while (1);
-	return 0;
-}
-
-
-
-
-
-
-
-
-
 
 
 

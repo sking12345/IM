@@ -16,6 +16,7 @@
 #include <list>
 #include "types.h"
 #include "message_base.h"
+#include "thread_pool.h"
 #include <iostream>
 using namespace std;
 
@@ -23,8 +24,17 @@ void accept_cb(int fd, short events, void* arg);
 void socket_read_cb(int fd, short events, void *arg);
 int tcp_server_init(int port, int listen_num);
 int tcp_server_start(int port, int listen_num, message_base*);
-void socket_send(int fd,const char *buf,int size);
+int socket_send(int cfd, char *buf, int size);
 
+void* send_work(void* arg);	//线程调用参数
+
+
+typedef struct send_queue	//消息发送队列
+{
+	int cfd;
+	int size;
+	list<char*> queue_list;
+} send_list_t;
 
 
 //定义基础类
@@ -35,12 +45,10 @@ private:
 	static event_sockt * ptr;
 	map <int, struct apk_list> apk_list_map;
 	map <int, struct fds_list> fds_list;
-
 	int listener_fd;	//socket
 	struct event* ev_listen;
 	message_base* msg_obj;
 public:
-
 	static pthread_mutex_t mutex;
 	static event_sockt * get_instance();
 	~event_sockt();
@@ -51,6 +59,8 @@ public:
 	void set_listener_event(struct event** ev_listen);	//记录tcp_server_start 时的event_new 资源
 	void set_msg_obj(message_base* msg_obj);
 	message_base* get_msg_obj();
+	void socket_send(int cfd, char *buf, int size);
+
 
 };
 

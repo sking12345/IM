@@ -41,6 +41,7 @@ typedef struct thread_pool  //线程池队列
 {
 	struct thread * thread_queue;	//线程池
 	int thread_num;		//线程数
+	int destroy_type;
 } thread_pool_t;
 
 /**

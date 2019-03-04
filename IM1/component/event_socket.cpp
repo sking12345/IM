@@ -1,5 +1,6 @@
 #include "event_socket.h"
 
+struct thread_pool* pool = NULL;
 
 void accept_cb(int fd, short events, void* arg)
 {
@@ -40,14 +41,53 @@ void socket_read_cb(int fd, short events, void *arg)
 	} else {
 		event_sockt_obj->read_connect(fd, apk);
 	}
+	return ;
 }
 
-void socket_send(int fd, const char *buf, int size)
+void* send_work(void* arg)
 {
-	//event_sockt *event_sockt_obj = event_sockt::get_instance();
-	//做线程池,将数据发到线程池中,然后触发
-
+	struct send_buf * test_apk = (struct send_buf*)arg;
+	printf("%s\n", test_apk->buf);
+	struct data_apk apk;
+	apk.size = test_apk->size + sizeof(struct send_buf);
+	int count = apk.size / APK_SIZE;
+	int iResult = 0;
+	for (int i = 0; i < count; i++)
+	{
+		apk.number = i;
+		memset(apk.buf, 0x00, sizeof(apk.buf));
+		if (i * APK_SIZE + APK_SIZE < apk.size)
+		{
+			memcpy(apk.buf, (char*)test_apk + i * APK_SIZE, APK_SIZE);
+		} else {
+			int opt = i * APK_SIZE;
+			memcpy(apk.buf, (char*)test_apk + opt, apk.size - opt);
+		}
+		if (i == count - 1)
+		{
+			apk.status = 0x01;
+		} else {
+			apk.status = 0x00;
+		}
+		write(test_apk->socket_fd, &apk, sizeof(apk));
+	}
+	return NULL;
 }
+
+//被某个线程调用
+int socket_send(int cfd, char *buf, int size)
+{
+	struct send_buf *sbuf = (struct send_buf*)malloc(sizeof(struct send_buf) + size);
+	sbuf->socket_fd = cfd;
+	sbuf->size = size;
+	memset(&sbuf->buf, 0x00, size);
+	memcpy(&sbuf->buf, buf, size);
+	thread_pool_add_job(pool, send_work, (void*)sbuf);
+	return 0;
+}
+
+
+
 
 
 
@@ -128,6 +168,7 @@ pthread_mutex_t event_sockt::mutex;
 
 event_sockt::event_sockt()
 {
+	pool = thread_pool_init(1, 100);
 	pthread_mutex_init(&mutex, NULL);
 }
 
@@ -169,9 +210,9 @@ void event_sockt::read_connect(int cfd, struct data_apk apk)
 		struct apk_list *apk_list = &iter->second;
 		apk_list->list.push_back(apk);
 	}
+
 	if (apk.status == 0x01)
 	{
-		printf("%d\n", apk.size);
 		char *buf = (char *)malloc(apk.size + 1);
 		if (buf == NULL)	//内存不足
 		{
@@ -184,14 +225,15 @@ void event_sockt::read_connect(int cfd, struct data_apk apk)
 		list<struct data_apk>::iterator iter_list;
 		for (iter_list = apk_list1->list.begin(); iter_list != apk_list1->list.end(); iter_list++)
 		{
-			memcpy(buf + iter_list->number * APK_SIZE, iter_list->buf, 1);
+			memcpy(buf + iter_list->number * APK_SIZE, iter_list->buf, APK_SIZE);
+
 		}
 		apk_list1->list.clear();
 		event_sockt *event_sockt_obj = event_sockt::get_instance();
 		message_base * msg_obj = event_sockt_obj->get_msg_obj();
-		msg_obj->new_message(1, buf);
-		free(buf);
-		buf = NULL;
+		msg_obj->new_message(cfd, buf);
+		// free(buf);
+		// buf = NULL;
 	}
 }
 void event_sockt::set_listener(int listener_fd)
@@ -216,6 +258,7 @@ void event_sockt::abnormal(int cfd)
 	this->fds_list.erase(cfd);	//删除维护客户端的连接
 
 }
+
 
 void event_sockt::set_listener_event(struct event** ev_listen)
 {
