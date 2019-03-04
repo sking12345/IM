@@ -14,9 +14,6 @@ void* work(void* arg)
 	return NULL;
 }
 
-
-
-
 int main()
 {
 	const char *ip = "127.0.0.1";
