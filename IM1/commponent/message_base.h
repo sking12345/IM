@@ -7,6 +7,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include "type.h"
 
 class message_base {
 
@@ -14,8 +15,9 @@ class message_base {
 	message_base();
 	~message_base();
 	void new_accept(int fd);
-	void new_msg(int fd, char buf, int size);
+	void new_msg(int fd, char *buf, int size);
 	void abnormal(int fd);
+	void set_thread_pool();
 };
 
 

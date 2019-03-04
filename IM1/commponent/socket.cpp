@@ -53,13 +53,41 @@ void tcp_server_read(int fd, short events, void *arg) {
 	struct event *ev = (struct event*)arg;
 	int len = read(fd, &apk, sizeof(struct data_apk));
 	if ( len <= 0 ) {
-		tcp_server->abnormal(fd);
+		tcp_server->msg_obj->abnormal(fd);
 		close(event_get_fd(ev));
 		event_free(ev);
 		return ;
 	} else {
-		//tcp_server->
-		// event_sockt_obj->read_connect(fd, apk);
+
+		if (apk.status == 0x01) {	//数据发送完毕
+			map<int, struct apk_list>::iterator iter = tcp_server->apk_list_map.find(fd);
+			if (iter == tcp_server->apk_list_map.end()) {
+				tcp_server->msg_obj->new_msg(fd, (char*)&apk.buf, apk.size + 1);
+			} else {
+				struct apk_list *apk_list = &iter->second;
+				list<struct data_apk>::iterator iter_list;
+				char *buf = (char*)malloc(apk.size + 1);
+				memset(buf, 0x00, apk.size + 1);
+				for (iter_list = apk_list->list.begin(); iter_list != apk_list->list.end(); iter_list++) {
+					memcpy(buf + iter_list->number * APK_SIZE, iter_list->buf, APK_SIZE);
+				}
+				tcp_server->msg_obj->new_msg(fd, buf, apk.size + 1);
+				free(buf);
+				buf = NULL;
+			}
+		} else {
+			map<int, struct apk_list>::iterator iter = tcp_server->apk_list_map.find(fd);
+			if (iter == tcp_server->apk_list_map.end()) {
+				struct apk_list apk_list;
+				apk_list.socket_fd = fd;
+				apk_list.time = time(NULL);
+				apk_list.list.push_back(apk);
+				tcp_server->apk_list_map.insert(pair<int, struct apk_list>(fd, apk_list));
+			} else {
+				struct apk_list *apk_list = &iter->second;
+				apk_list->list.push_back(apk);
+			}
+		}
 	}
 	return ;
 }
@@ -71,9 +99,6 @@ void tcp_server_accept(int fd, short events, void* arg) {
 
 	sockfd = accept(fd, (struct sockaddr*)&client, &len );
 	evutil_make_socket_nonblocking(sockfd);
-
-	// event_sockt *event_sockt_obj = event_sockt::get_instance();
-	// event_sockt_obj->new_connect(fd, &client);
 
 	tcp_server->msg_obj->new_accept(fd);
 	struct event_base* base = (struct event_base*)arg;
