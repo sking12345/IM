@@ -3,11 +3,13 @@
 
 struct tcp_server* tcp_server = NULL;
 
-int tcp_server_start(int port, int listen_num)
-{
+int tcp_server_start(int port, int listen_num, message_base*msg) {
+	if (msg == NULL) {
+		printf("%s\n", "error:tcp_server_start message_base don't NULL");
+		return -1;
+	}
 	int errno_save;
 	evutil_socket_t listener;
-
 	listener = socket(AF_INET, SOCK_STREAM, 0);
 	if ( listener == -1 )
 		return -1;
@@ -28,10 +30,10 @@ int tcp_server_start(int port, int listen_num)
 
 	//跨平台统一接口，将套接字设置为非阻塞状态
 	evutil_make_socket_nonblocking(listener);
-	if(tcp_server == NULL)
-	{
+	if (tcp_server == NULL) {
 		tcp_server = (struct tcp_server*)malloc(sizeof(struct tcp_server));
 	}
+	tcp_server->msg_obj = msg;
 	tcp_server->evt_base =  event_base_new();
 	tcp_server->ev_listen =  event_new(tcp_server->evt_base, listener, EV_READ | EV_PERSIST, tcp_server_accept, (void*)tcp_server->evt_base);
 	event_add(tcp_server->ev_listen, NULL);
@@ -45,16 +47,59 @@ error:
 	return -1;
 
 }
-void tcp_server_read(int fd, short events, void *arg)
-{
+void tcp_server_read(int fd, short events, void *arg) {
+
+	struct data_apk apk;
+	struct event *ev = (struct event*)arg;
+	int len = read(fd, &apk, sizeof(struct data_apk));
+	if ( len <= 0 ) {
+		tcp_server->abnormal(fd);
+		close(event_get_fd(ev));
+		event_free(ev);
+		return ;
+	} else {
+		//tcp_server->
+		// event_sockt_obj->read_connect(fd, apk);
+	}
+	return ;
+}
+void tcp_server_accept(int fd, short events, void* arg) {
+	evutil_socket_t sockfd;
+
+	struct sockaddr_in client;
+	socklen_t len = sizeof(client);
+
+	sockfd = accept(fd, (struct sockaddr*)&client, &len );
+	evutil_make_socket_nonblocking(sockfd);
+
+	// event_sockt *event_sockt_obj = event_sockt::get_instance();
+	// event_sockt_obj->new_connect(fd, &client);
+
+	tcp_server->msg_obj->new_accept(fd);
+	struct event_base* base = (struct event_base*)arg;
+
+	//仅仅是为了动态创建一个event结构体
+	struct event *ev = event_new(NULL, -1, 0, NULL, NULL);
+	//将动态创建的结构体作为event的回调参数
+	event_assign(ev, base, sockfd, EV_READ | EV_PERSIST,
+	             tcp_server_read, (void*)ev);
+}
+
+void tcp_server_stop() {
+	if (tcp_server != NULL) {
+		event_base_free(tcp_server->evt_base);
+		event_free(tcp_server->ev_listen);
+		free(tcp_server);
+		tcp_server = NULL;
+	}
 
 }
-void tcp_server_accept(int fd, short events, void* arg)
-{
 
-}
 
-void tcp_server_stop(struct tcp_server** tcp_server)
-{
 
-}
+
+
+
+
+
+

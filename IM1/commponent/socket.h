@@ -19,25 +19,45 @@
 #include <iostream>
 #include "message_base.h"
 using namespace std;
-typedef struct tcp_fds
-{
-	int socket_fd;
-	int last_time;	//最后一次数据通信的时间
-	int status;	//状态,用于验证是否正常登录
-}tcp_fds_t;
 
-typedef struct tcp_server
-{
-	map<int,struct tcp_fds> queue_map;
+#define APK_SIZE 1
+typedef  unsigned char uint8;
+typedef  unsigned short uint16;
+typedef  unsigned int uint32;
+typedef  unsigned long long uint64;
+
+typedef  char int8;
+typedef  short int16;
+typedef  int int32;
+typedef  long long int64;
+
+typedef struct  data_apk {	// 定义传输基本数据结构
+	uint8 version;	//版本
+	uint8 type;		//类型
+	uint8 status;	//状态
+	uint32 number;	//编号
+	uint32 size;	//数据总大小
+	uint8 buf[APK_SIZE + 1];	//数据
+} data_apk_t;
+
+typedef struct tcp_server {
 	struct event* ev_listen;
 	struct event_base* evt_base;
 	message_base *msg_obj;
-}tcp_server_t;
+} tcp_server_t;
 
-int  tcp_server_start(int port, int listen_num);
+int  tcp_server_start(int port, int listen_num, message_base*);
 void tcp_server_read(int fd, short events, void *arg);
 void tcp_server_accept(int fd, short events, void* arg);
-void tcp_server_stop(struct tcp_server**);
-int send_msg(int fd,char *buf,int size);
+void tcp_server_stop();
+int send_msg(int fd, char *buf, int size);
 
 #endif
+
+
+
+
+
+
+
+

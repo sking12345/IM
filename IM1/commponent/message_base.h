@@ -5,13 +5,17 @@
 #ifndef MASSAGE_BASE_H
 #define MASSAGE_BASE_H
 
+#include <stdlib.h>
+#include <stdio.h>
 
-class message_base
-{
-public:
-	void new_accept();
-	void new_msg();
-	void abnormal();
+class message_base {
+
+  public:
+	message_base();
+	~message_base();
+	void new_accept(int fd);
+	void new_msg(int fd, char buf, int size);
+	void abnormal(int fd);
 };
 
 
