@@ -32,6 +32,9 @@ typedef struct send_buf
 	char buf[0];
 } send_buf_t;
 
+
+
+
 typedef struct  data_apk	// 定义传输基本数据结构
 {
 	uint8 version;	//版本

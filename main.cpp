@@ -33,9 +33,12 @@ public:
 	}
 	void new_message(int fd, void *buf)
 	{
-		struct test_apk *apk = (struct test_apk*)buf;
-		apk->test = fd;
-		thread_pool_add_job(pool, work, (void*)apk);
+		struct send_buf *recv_buf = (struct send_buf*)buf;
+		printf("%s\n", recv_buf->buf);
+		socket_send(fd, recv_buf->buf, strlen(recv_buf->buf));
+		// struct test_apk *apk = (struct test_apk*)buf;
+		// apk->test = fd;
+		// thread_pool_add_job(pool, work, (void*)apk);
 	}
 	void socket_abnormal(int fd)
 	{

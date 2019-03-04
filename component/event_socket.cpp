@@ -82,11 +82,9 @@ int socket_send(int cfd, char *buf, int size)
 	sbuf->size = size;
 	memset(&sbuf->buf, 0x00, size);
 	memcpy(&sbuf->buf, buf, size);
-	thread_pool_add_job(pool, send_work, (void*)sbuf);
+	thread_pool_add_job(pool, send_work, (void*)sbuf, size);
 	return 0;
 }
-
-
 
 
 

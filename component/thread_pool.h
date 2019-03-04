@@ -18,6 +18,7 @@
 typedef struct thread_job
 {
 	void* (*callback_function)(void *arg);
+	int arg_size;
 	void                *arg;
 	struct thread_job   *next;
 } thread_job_t;
@@ -65,7 +66,7 @@ void set_destroy_stop(struct thread_pool*);
  * @return             成功:1 失败:-1
  */
 
-int thread_pool_add_job(struct thread_pool* pool, void* (*callback_function)(void *arg), void *arg);
+int thread_pool_add_job(struct thread_pool* pool, void* (*callback_function)(void *arg), void *arg, int arg_size);
 
 /**
  * [threadpool_destroy 销毁线程池]
@@ -80,6 +81,9 @@ int thread_pool_destroy(struct thread_pool **pool);	//
  * @param arg [线程地址]
  */
 void* thread_pool_function(void* arg); // 线程池中线程函数
+
+
+void* send_work(void* arg);
 
 
 

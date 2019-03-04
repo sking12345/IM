@@ -41,7 +41,7 @@ void set_destroy_stop(struct thread_pool* pool)
 
 }
 
-int thread_pool_add_job(struct thread_pool* thread_pool, void* (*callback_function)(void *arg), void *arg)
+int thread_pool_add_job(struct thread_pool* thread_pool, void* (*callback_function)(void *arg), void *arg, int arg_size)
 {
 	assert(thread_pool != NULL);
 	assert(callback_function != NULL);
@@ -70,6 +70,7 @@ int thread_pool_add_job(struct thread_pool* thread_pool, void* (*callback_functi
 	}
 	pjob->callback_function = callback_function;
 	pjob->arg = arg;
+	pjob->arg_size = arg_size;
 	pjob->next = NULL;
 	thread->queue_cur_num++;
 	if (thread->head == NULL)
