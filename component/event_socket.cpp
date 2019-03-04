@@ -1,101 +1,6 @@
 #include "event_socket.h"
-#include <string.h>
 
-
-singleton *singleton::ptr = NULL;
-pthread_mutex_t singleton::mutex;
-
-singleton::singleton()
-{
-	pthread_mutex_init(&mutex, NULL);
-
-
-}
-singleton *singleton::get_instance()
-{
-	if (ptr == NULL)
-	{
-		pthread_mutex_lock(&mutex);
-		if (ptr == NULL)
-		{
-			ptr = new singleton();
-			pthread_mutex_unlock(&mutex);
-		}
-	}
-	return ptr;
-}
-//记录设置监听端口的fd
-void singleton::set_listener(int listener_fd)
-{
-	this->listener_fd = listener_fd;
-}
-/**
- * [singleton::new_connect 新的客户端连接]
- * @param sfd [description]
- */
-void singleton::new_connect(int sfd) {
-	struct connect_list clist;
-	clist.status = false;
-	clist.time = time(NULL);
-	this->client_fd_map.insert(pair<int, struct connect_list>(listener_fd, clist));
-}
-/**
- * [singleton::read_connect 接收到客户端发送的数据]
- * @param sfd [description]
- * @param apk [description]
- */
-void singleton::read_connect(int cfd, struct data_apk apk)
-{
-
-	map<int, struct apk_list>::iterator iter = this->apk_list_map.find(cfd);
-	if (iter == this->apk_list_map.end())
-	{
-		struct apk_list apk_list;
-		apk_list.sockfd = cfd;
-		apk_list.list.push_back(apk);
-		this->apk_list_map.insert(pair<int, struct apk_list>(cfd, apk_list));
-	} else {
-		struct apk_list *apk_list = &iter->second;
-		apk_list->list.push_back(apk);
-	}
-	if (apk.status == 0x01)
-	{
-		printf("%d\n", apk.size);
-		char *buf = (char *)malloc(apk.size + 1);
-		memset(buf, 0, apk.size + 1);
-		map<int, struct apk_list>::iterator iter1 =  this->apk_list_map.find(cfd);
-		struct apk_list *apk_list1 = &iter1->second;
-		list<struct data_apk>::iterator iter_list;
-		for (iter_list = apk_list1->list.begin(); iter_list != apk_list1->list.end(); iter_list++)
-		{
-			memcpy(buf + iter_list->number * APK_SIZE, iter_list->buf, APK_SIZE);
-		}
-		// struct test_apk* tsk_apk = (struct test_apk*)buf;
-		struct test_apk* tsk_apk = NULL;
-		tsk_apk = (struct test_apk*)buf;
-
-		printf("%d -- %s\n", tsk_apk->test, tsk_apk->buf);
-		apk_list1->list.clear();
-		// printf("%d----%s\n", tsk_apk->test, "xx");
-		// free(tsk_apk);
-		// tsk_apk = NULL;
-		// printf("%d\n", test_apk->test);
-
-		// printf("%s\n", buf );
-		free(buf);
-		buf = NULL;
-	}
-}
-
-void singleton::abnormal(int sfd)
-{
-	// map<int, struct apk_list>::iterator iter1 =  this->apk_list_map.find(sfd);
-	// struct apk_list *apk_list1 = &iter1->second;
-	// apk_list1->list.clear();
-	// this->apk_list_map.erase(sfd);
-	// this->client_fd_map.erase(sfd);	//删除维护客户端的连接
-	printf("%s\n", "close" );
-}
+struct thread_pool* pool = NULL;
 
 void accept_cb(int fd, short events, void* arg)
 {
@@ -107,8 +12,8 @@ void accept_cb(int fd, short events, void* arg)
 	sockfd = accept(fd, (struct sockaddr*)&client, &len );
 	evutil_make_socket_nonblocking(sockfd);
 
-	singleton *singleton_obj = singleton::get_instance();
-	singleton_obj->new_connect(fd);
+	event_sockt *event_sockt_obj = event_sockt::get_instance();
+	event_sockt_obj->new_connect(fd, &client);
 
 
 	struct event_base* base = (struct event_base*)arg;
@@ -125,18 +30,66 @@ void socket_read_cb(int fd, short events, void *arg)
 {
 	struct data_apk apk;
 	struct event *ev = (struct event*)arg;
-	singleton *singleton_obj = singleton::get_instance();
+	event_sockt *event_sockt_obj = event_sockt::get_instance();
 	int len = read(fd, &apk, sizeof(struct data_apk));
 	if ( len <= 0 )
 	{
-		singleton_obj->abnormal(fd);
+		event_sockt_obj->abnormal(fd);
 		close(event_get_fd(ev));
 		event_free(ev);
 		return ;
 	} else {
-		singleton_obj->read_connect(fd, apk);
+		event_sockt_obj->read_connect(fd, apk);
 	}
+	return ;
 }
+
+void* send_work(void* arg)
+{
+	struct send_buf * test_apk = (struct send_buf*)arg;
+	printf("%s\n", test_apk->buf);
+	struct data_apk apk;
+	apk.size = test_apk->size + sizeof(struct send_buf);
+	int count = apk.size / APK_SIZE;
+	int iResult = 0;
+	for (int i = 0; i < count; i++)
+	{
+		apk.number = i;
+		memset(apk.buf, 0x00, sizeof(apk.buf));
+		if (i * APK_SIZE + APK_SIZE < apk.size)
+		{
+			memcpy(apk.buf, (char*)test_apk + i * APK_SIZE, APK_SIZE);
+		} else {
+			int opt = i * APK_SIZE;
+			memcpy(apk.buf, (char*)test_apk + opt, apk.size - opt);
+		}
+		if (i == count - 1)
+		{
+			apk.status = 0x01;
+		} else {
+			apk.status = 0x00;
+		}
+		write(test_apk->socket_fd, &apk, sizeof(apk));
+	}
+	return NULL;
+}
+
+//被某个线程调用
+int socket_send(int cfd, char *buf, int size)
+{
+	struct send_buf *sbuf = (struct send_buf*)malloc(sizeof(struct send_buf) + size);
+	sbuf->socket_fd = cfd;
+	sbuf->size = size;
+	memset(&sbuf->buf, 0x00, size);
+	memcpy(&sbuf->buf, buf, size);
+	thread_pool_add_job(pool, send_work, (void*)sbuf);
+	return 0;
+}
+
+
+
+
+
 
 int tcp_server_init(int port, int listen_num)
 {
@@ -161,7 +114,6 @@ int tcp_server_init(int port, int listen_num)
 	if ( listen(listener, listen_num) < 0)
 		goto error;
 
-
 	//跨平台统一接口，将套接字设置为非阻塞状态
 	evutil_make_socket_nonblocking(listener);
 
@@ -175,20 +127,160 @@ error:
 }
 
 
-int tcp_server_start(int port, int listen_num) {
+int tcp_server_start(int port, int listen_num, message_base* msg_obj) {
 	int listener = tcp_server_init(port, listen_num);
 	if (listener == -1)
 	{
-		perror("tcp_server_init error");
+		printf("tcp_server_init error");
 	}
-	singleton *singleton_obj = singleton::get_instance();
-	singleton_obj->set_listener(listener);
+	event_sockt *event_sockt_obj = event_sockt::get_instance();
+#if DEBUG == 0x01
+	if (msg_obj == NULL)
+	{
+		event_sockt_obj->set_msg_obj(new message_base());
+	} else {
+		event_sockt_obj->set_msg_obj(msg_obj);
+	}
+#else
+	if (msg_obj == NULL)
+	{
+		printf("error: tcp_server_start Missing message_base object\n");
+		return false;
+	}
+	event_sockt_obj->set_msg_obj(msg_obj);
+#endif
+
+	event_sockt_obj->set_listener(listener);
 	struct event_base * base = event_base_new();
 	struct event* ev_listen = event_new(base, listener, EV_READ | EV_PERSIST, accept_cb, (void*)base);
+	event_sockt_obj->set_listener_event(&ev_listen);
 	event_add(ev_listen, NULL);
 	event_base_dispatch(base);
 	return true;
 }
+
+
+
+//--------操作类封装
+//
+event_sockt *event_sockt::ptr = NULL;
+pthread_mutex_t event_sockt::mutex;
+
+event_sockt::event_sockt()
+{
+	pool = thread_pool_init(1, 100);
+	pthread_mutex_init(&mutex, NULL);
+}
+
+event_sockt *event_sockt::get_instance()
+{
+	if (ptr == NULL)
+	{
+		pthread_mutex_lock(&mutex);
+		if (ptr == NULL)
+		{
+			ptr = new event_sockt();
+			pthread_mutex_unlock(&mutex);
+		}
+	}
+	return ptr;
+}
+
+void event_sockt::new_connect(int listener_fd, struct sockaddr_in* client)
+{
+
+#if DEBUG == 0x01
+	printf("%s\n", "new cfd");
+#endif
+	struct fds_list cfd_list;
+	cfd_list.status = false;
+	cfd_list.time = time(NULL);
+	this->fds_list.insert(pair<int, struct fds_list>(listener_fd, cfd_list));
+}
+void event_sockt::read_connect(int cfd, struct data_apk apk)
+{
+	map<int, struct apk_list>::iterator iter = this->apk_list_map.find(cfd);
+	if (iter == this->apk_list_map.end())
+	{
+		struct apk_list apk_list;
+		apk_list.sockfd = cfd;
+		apk_list.list.push_back(apk);
+		this->apk_list_map.insert(pair<int, struct apk_list>(cfd, apk_list));
+	} else {
+		struct apk_list *apk_list = &iter->second;
+		apk_list->list.push_back(apk);
+	}
+
+	if (apk.status == 0x01)
+	{
+		char *buf = (char *)malloc(apk.size + 1);
+		if (buf == NULL)	//内存不足
+		{
+			printf("%s\n", "error:malloc fail");
+			return ;
+		}
+		memset(buf, 0x00, apk.size + 1);
+		map<int, struct apk_list>::iterator iter1 =  this->apk_list_map.find(cfd);
+		struct apk_list *apk_list1 = &iter1->second;
+		list<struct data_apk>::iterator iter_list;
+		for (iter_list = apk_list1->list.begin(); iter_list != apk_list1->list.end(); iter_list++)
+		{
+			memcpy(buf + iter_list->number * APK_SIZE, iter_list->buf, APK_SIZE);
+
+		}
+		apk_list1->list.clear();
+		event_sockt *event_sockt_obj = event_sockt::get_instance();
+		message_base * msg_obj = event_sockt_obj->get_msg_obj();
+		msg_obj->new_message(cfd, buf);
+		// free(buf);
+		// buf = NULL;
+	}
+}
+void event_sockt::set_listener(int listener_fd)
+{
+	this->listener_fd = listener_fd;
+}
+void event_sockt::abnormal(int cfd)
+{
+	printf("%s\n", "close" );
+	map<int, struct apk_list>::iterator iter1 =  this->apk_list_map.find(cfd);
+	if (iter1 == this->apk_list_map.end())
+	{
+		return;
+	}
+	struct apk_list *apk_list1 = &iter1->second;
+	if (apk_list1->list.empty())
+	{
+		return;
+	}
+	apk_list1->list.clear();
+	this->apk_list_map.erase(cfd);
+	this->fds_list.erase(cfd);	//删除维护客户端的连接
+
+}
+
+
+void event_sockt::set_listener_event(struct event** ev_listen)
+{
+	this->ev_listen = *ev_listen;
+
+}
+
+void event_sockt::set_msg_obj(message_base* msg_obj)
+{
+	this->msg_obj = msg_obj;
+}
+message_base* event_sockt::get_msg_obj()
+{
+	return this->msg_obj;
+}
+event_sockt::~event_sockt()
+{
+	close(event_get_fd(this->ev_listen));
+	event_free(this->ev_listen);
+	this->ev_listen = NULL;
+}
+
 
 
 

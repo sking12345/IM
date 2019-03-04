@@ -10,7 +10,7 @@
 #include <fcntl.h>
 #include<errno.h>
 #include <string.h>
-#include "component/type.h"
+#include "component/types.h"
 #define SERVER_PORT 8000
 
 int main(int argc, char *argv[])
@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
     memset(test_apk, 0x00, sizeof(struct test_apk) + strlen(str1) + 1);
     test_apk->test = 100;
     memcpy(test_apk->buf, str1, strlen(str1));
-    // printf("%ld\n", sizeof(struct test_apk) + strlen(str1));
+
     printf("%s\n", test_apk->buf);
 
     int opt;
@@ -48,13 +48,6 @@ int main(int argc, char *argv[])
     if ((getsockopt(confd, SOL_SOCKET, SO_SNDBUF, (char*)&opt, &len1)) == 0) {
         printf("SO_KEEPALIVE Value: %d/n", opt);
     }
-
-    // memset(test_apk.buf, 0x00, sizeof(test_apk.buf));
-    // memcpy(test_apk.buf, "dd", 2);
-
-    // char * tt = (char *)&test_apk;
-    // printf("%ld\n", sizeof(struct test_apk));
-
     apk.size = sizeof(struct test_apk) + strlen(str1) ;
     int count = apk.size / APK_SIZE;
     int iResult = 0;
@@ -75,19 +68,36 @@ int main(int argc, char *argv[])
         } else {
             apk.status = 0x00;
         }
-        printf("%d---%s\n",  i * APK_SIZE, apk.buf);
-        // write(confd, &apk, sizeof(apk));
-        iResult = send(confd, &apk, sizeof(apk), 0);
+        write(confd, &apk, sizeof(apk));
+        // iResult = send(confd, &apk, sizeof(apk), 0);
 
     }
     free(test_apk);
     test_apk = NULL;
-    // memset(apk.buf, 0x00, sizeof(apk.buf));
-    // memcpy(apk.buf, "ddd", 3);
 
-    //4.请求服务器处理数据
-    // write(confd, &apk, sizeof(apk));
+    char *buf = NULL;
+    while (1)
+    {   struct data_apk apk;
+        int len = read(confd, &apk, sizeof(struct data_apk));
+        if (buf == NULL)
+        {
+            buf = (char*)malloc(apk.size + sizeof(struct send_buf) + 1);
+            memset(buf, 0x00, apk.size + sizeof(struct send_buf) + 1);
+        }
 
+        memcpy(buf + apk.number * APK_SIZE, apk.buf, APK_SIZE);
+        if (len <= 0)
+        {
+            printf("error:\n");
+            break;
+        }
+        if (apk.status == 0x01)
+        {
+            struct send_buf *send_buf = ( struct send_buf*)buf;
+            printf("%s\n", send_buf->buf);
+        }
+
+    }
     //5.关闭socket
     close(confd);
     return 0;
