@@ -19,7 +19,7 @@ typedef  long long int64;
 
 typedef struct  data_apk {	// 定义传输基本数据结构
 	uint8 version;	//版本
-	uint8 type;		//类型
+	uint8 type;		//类型 0x01 新消息，0x02 确认消息
 	uint8 status;	//状态
 	uint32 number;	//编号
 	uint32 size;	//数据总大小
@@ -32,6 +32,11 @@ typedef struct apk_list {
 	list<struct  data_apk> list;
 } apk_list_t;
 
+//一对多信息交互
 
+typedef struct msg_infos {
+	char *buf;
+
+};
 
 #endif
