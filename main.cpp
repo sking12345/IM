@@ -22,6 +22,7 @@ void* work(void* arg)
 }
 
 
+
 class msg: public message_base
 {
 private:
