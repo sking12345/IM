@@ -6,31 +6,29 @@
 #include <iostream>
 using namespace std;
 
+#define TYPE "server"
+
 #define PORT 8000
 #define LISTEN_NUM 10
 
 
 class msg: public message_base {
 
-public:
-	void new_accept(int fd)
-	{
+  public:
+	void new_accept(int fd) {
 		printf("%s\n", "news xxx fd");
 
 	}
-	void new_msg(int fd, char *buf, int size)
-	{
+	void new_msg(int fd, char *buf, int size) {
 		printf("%s--%s\n", "news msg fd:", buf);
 		server_send_msg(fd, (char*)"xx", 2);
 	}
-	void abnormal(int fd)
-	{
+	void abnormal(int fd) {
 		printf("%s\n", "abnormal msg fd");
 	}
 };
 
-void* work(void* arg)
-{
+void* work(void* arg) {
 	printf("%s\n", (char*)arg);
 	sleep(1);
 	return NULL;
