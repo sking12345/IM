@@ -41,7 +41,7 @@ int main()
 	// }
 	const char *buf = "ddd";
 	client_send_msg((char*)buf, strlen(buf));
-	sleep(1);
+	sleep(100);
 	thread_pool_destroy(&pool);
 	tcp_client_end();
 

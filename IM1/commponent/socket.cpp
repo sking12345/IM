@@ -282,6 +282,7 @@ int set_client_call_function(int sfd, void* (*msg_call_function)(void *arg), voi
 }
 int set_server_thread_pool(struct thread_pool **pool)
 {
+	printf("%s\n", "xx");
 	tcp_server.pool = *pool;
 	return true;
 }

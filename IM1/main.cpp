@@ -21,6 +21,7 @@ public:
 	void new_msg(int fd, char *buf, int size)
 	{
 		printf("%s--%s\n", "news msg fd:", buf);
+		server_send_msg(fd, (char*)"xx", 2);
 	}
 	void abnormal(int fd)
 	{
@@ -37,7 +38,8 @@ void* work(void* arg)
 
 
 int main() {
-
+	struct thread_pool* pool = thread_pool_init(1, 100);
+	set_server_thread_pool(&pool);
 	tcp_server_start(PORT, LISTEN_NUM, new msg());
 	tcp_server_end();
 	//
