@@ -84,7 +84,7 @@ int server_send_msg(int fd, char * buf, int size)
 	return true;
 }
 //将需要的消息放入队列中
-int clent_send_msg(char * buf, int size)
+int client_send_msg(char * buf, int size)
 {
 	size_t m_size = sizeof(struct client_msg_list) + size;
 	struct client_msg_list *msg_list = (struct client_msg_list*)malloc(m_size);
@@ -95,7 +95,7 @@ int clent_send_msg(char * buf, int size)
 	msg_list->time = time(NULL);
 	memcpy(msg_list->buf, buf, size);
 	//thread_pool_add_job(tcp_client->pool, send_msg_work, (void*)msg_list, m_size);
-	tcp_client->send_msg_list.push_back(msg_list);
+	//tcp_client->send_msg_list.push_back(msg_list);
 
 	return true;
 }

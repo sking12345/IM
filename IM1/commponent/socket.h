@@ -45,9 +45,11 @@ typedef struct tcp_server {
 	struct event* ev_listen;
 	struct event_base* evt_base;
 	message_base *msg_obj;
+	struct thread_pool *pool;
+
 	map<int, struct apk_list> apk_list_map;
 	map<int, struct server_msg_list> msg_list_map;
-	struct thread_pool *pool;
+
 } tcp_server_t;
 
 typedef struct tcp_client
@@ -67,7 +69,7 @@ typedef struct tcp_client
 int send_msg(int fd, int number);
 
 int server_send_msg(int fd, char * buf, int size);
-int clent_send_msg(char * buf, int size);
+int client_send_msg(char * buf, int size);
 
 int tcp_server_init(int port, int listen_num);
 int  tcp_server_start(int port, int listen_num, message_base*);
@@ -81,6 +83,22 @@ void* thread_function(void* arg);
 int set_client_call_function(int sfd, void* (*msg_call_function)(void *arg), void* (*err_call_function)());
 int set_client_thread_pool(struct thread_pool **pool);
 void tcp_client_end();
+
+
+class event_sockt
+{
+private:
+	event_sockt();
+	list<struct client_msg_list*> send_msg_list;
+public:
+	static pthread_mutex_t mutex;
+	static event_sockt * get_instance();
+	~event_sockt();
+
+
+
+};
+
 
 #endif
 
