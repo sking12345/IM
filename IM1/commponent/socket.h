@@ -65,7 +65,6 @@ typedef struct tcp_client
 } tcp_client_t;
 
 
-
 int send_msg(int fd, int number);
 
 int server_send_msg(int fd, char * buf, int size);
@@ -83,21 +82,6 @@ void* thread_function(void* arg);
 int set_client_call_function(int sfd, void* (*msg_call_function)(void *arg), void* (*err_call_function)());
 int set_client_thread_pool(struct thread_pool **pool);
 void tcp_client_end();
-
-
-class event_sockt
-{
-private:
-	event_sockt();
-	list<struct client_msg_list*> send_msg_list;
-public:
-	static pthread_mutex_t mutex;
-	static event_sockt * get_instance();
-	~event_sockt();
-
-
-
-};
 
 
 #endif
