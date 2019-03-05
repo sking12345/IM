@@ -32,11 +32,5 @@ typedef struct apk_list {
 	list<struct  data_apk> list;
 } apk_list_t;
 
-//一对多信息交互
-
-typedef struct msg_infos {
-	char *buf;
-
-};
 
 #endif

@@ -8,16 +8,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "type.h"
+#include <unistd.h>
 
 class message_base {
 
-  public:
+public:
 	message_base();
-	~message_base();
-	void new_accept(int fd);
-	void new_msg(int fd, char *buf, int size);
-	void abnormal(int fd);
-	void set_thread_pool();
+	virtual ~message_base();
+	virtual void new_accept(int fd);
+	virtual void new_msg(int fd, char *buf, int size);
+	virtual void abnormal(int fd);
 };
 
 
