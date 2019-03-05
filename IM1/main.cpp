@@ -20,7 +20,7 @@ public:
 	}
 	void new_msg(int fd, char *buf, int size)
 	{
-		printf("%s\n", "news msg fd");
+		printf("%s--%s\n", "news msg fd:", buf);
 	}
 	void abnormal(int fd)
 	{

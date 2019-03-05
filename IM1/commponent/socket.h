@@ -46,7 +46,6 @@ typedef struct tcp_server {
 	struct event_base* evt_base;
 	message_base *msg_obj;
 	struct thread_pool *pool;
-
 	map<int, struct apk_list> apk_list_map;
 	map<int, struct server_msg_list> msg_list_map;
 

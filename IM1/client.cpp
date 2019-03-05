@@ -5,10 +5,15 @@
 #include <stdlib.h>
 #include <string.h>
 #define SERVER_PORT 8000
-
+#include <map>
+#include <list>
 #include <iostream>
 using namespace std;
 
+typedef struct server_msg_list1
+{
+	list<char*> send_msg_list;
+} server_msg_list_t1;
 
 void* work(void* arg)
 {
@@ -20,6 +25,7 @@ void* work(void* arg)
 
 int main()
 {
+
 
 	const char *ip = "127.0.0.1";
 	struct thread_pool* pool = thread_pool_init(1, 10);

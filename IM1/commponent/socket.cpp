@@ -1,7 +1,7 @@
 #include "socket.h"
 
-struct tcp_server* tcp_server = NULL;
-struct tcp_client *tcp_client = NULL;
+static struct tcp_server tcp_server;
+static struct tcp_client tcp_client;
 
 
 //消息发送
@@ -71,8 +71,8 @@ int server_send_msg(int fd, char * buf, int size)
 	msg_list->time = time(NULL);
 	memcpy(msg_list->buf, buf, size);
 
-	map<int, struct server_msg_list>::iterator iter = tcp_server->msg_list_map.find(fd);
-	if (iter == tcp_server->msg_list_map.end())
+	map<int, struct server_msg_list>::iterator iter = tcp_server.msg_list_map.find(fd);
+	if (iter == tcp_server.msg_list_map.end())
 	{
 		struct server_msg_list server_msg_lst;
 		server_msg_lst.send_msg_list.push_back(msg_list);
@@ -80,7 +80,7 @@ int server_send_msg(int fd, char * buf, int size)
 		struct server_msg_list *server_msg_lst = &iter->second;
 		server_msg_lst->send_msg_list.push_back(msg_list);
 	}
-	thread_pool_add_job(tcp_server->pool, send_msg_work, (void*)msg_list, m_size);
+	thread_pool_add_job(tcp_server.pool, send_msg_work, (void*)msg_list, m_size);
 	return true;
 }
 //将需要的消息放入队列中
@@ -91,11 +91,11 @@ int client_send_msg(char * buf, int size)
 	memset(msg_list, 0x00, m_size);
 	msg_list->buf_size = size;
 	msg_list->number = 0;
-	msg_list->send_fd = tcp_client->socket_fd;
+	msg_list->send_fd = tcp_client.socket_fd;
 	msg_list->time = time(NULL);
 	memcpy(msg_list->buf, buf, size);
-	//thread_pool_add_job(tcp_client->pool, send_msg_work, (void*)msg_list, m_size);
-	//tcp_client->send_msg_list.push_back(msg_list);
+	tcp_client.send_msg_list.push_back(msg_list);
+	thread_pool_add_job(tcp_client.pool, send_msg_work, (void*)msg_list, m_size);
 
 	return true;
 }
@@ -139,15 +139,12 @@ int  tcp_server_start(int port, int listen_num, message_base*msg)
 		printf("%s\n", "error:tcp_server_start message_base don't NULL");
 		return -1;
 	}
-	if (tcp_server == NULL) {
-		tcp_server = (struct tcp_server*)malloc(sizeof(struct tcp_server));
-	}
-	tcp_server->msg_obj = msg;
+	tcp_server.msg_obj = msg;
 	int listener = tcp_server_init(port, listen_num);
-	tcp_server->evt_base = event_base_new();
-	tcp_server->ev_listen = event_new(tcp_server->evt_base, listener, EV_READ | EV_PERSIST, tcp_server_accept, (void*)tcp_server->evt_base);
-	event_add(tcp_server->ev_listen, NULL);
-	event_base_dispatch(tcp_server->evt_base);
+	tcp_server.evt_base = event_base_new();
+	tcp_server.ev_listen = event_new(tcp_server.evt_base, listener, EV_READ | EV_PERSIST, tcp_server_accept, (void*)tcp_server.evt_base);
+	event_add(tcp_server.ev_listen, NULL);
+	event_base_dispatch(tcp_server.evt_base);
 	return true;
 
 }
@@ -157,15 +154,15 @@ void tcp_server_read(int fd, short events, void *arg)
 	struct event *ev = (struct event*)arg;
 	int len = read(fd, &apk, sizeof(struct data_apk));
 	if ( len <= 0 ) {
-		tcp_server->msg_obj->abnormal(fd);
+		tcp_server.msg_obj->abnormal(fd);
 		close(event_get_fd(ev));
 		event_free(ev);
 		return ;
 	} else {
 		if (apk.status == 0x01) {	//数据发送完毕
-			map<int, struct apk_list>::iterator iter = tcp_server->apk_list_map.find(fd);
-			if (iter == tcp_server->apk_list_map.end()) {
-				tcp_server->msg_obj->new_msg(fd, (char*)&apk.buf, apk.size + 1);
+			map<int, struct apk_list>::iterator iter = tcp_server.apk_list_map.find(fd);
+			if (iter == tcp_server.apk_list_map.end()) {
+				tcp_server.msg_obj->new_msg(fd, (char*)&apk.buf, apk.size + 1);
 			} else {
 				struct apk_list *apk_list = &iter->second;
 				list<struct data_apk>::iterator iter_list;
@@ -175,18 +172,18 @@ void tcp_server_read(int fd, short events, void *arg)
 					memcpy(buf + iter_list->number * APK_SIZE, iter_list->buf, APK_SIZE);
 				}
 				memcpy(buf + apk.number * APK_SIZE, apk.buf, APK_SIZE);
-				tcp_server->msg_obj->new_msg(fd, buf, apk.size + 1);
+				tcp_server.msg_obj->new_msg(fd, buf, apk.size + 1);
 				free(buf);
 				buf = NULL;
 			}
 		} else {
-			map<int, struct apk_list>::iterator iter = tcp_server->apk_list_map.find(fd);
-			if (iter == tcp_server->apk_list_map.end()) {
+			map<int, struct apk_list>::iterator iter = tcp_server.apk_list_map.find(fd);
+			if (iter == tcp_server.apk_list_map.end()) {
 				struct apk_list apk_list;
 				apk_list.socket_fd = fd;
 				apk_list.time = time(NULL);
 				apk_list.list.push_back(apk);
-				tcp_server->apk_list_map.insert(pair<int, struct apk_list>(fd, apk_list));
+				tcp_server.apk_list_map.insert(pair<int, struct apk_list>(fd, apk_list));
 			} else {
 				struct apk_list *apk_list = &iter->second;
 				apk_list->list.push_back(apk);
@@ -204,7 +201,7 @@ void tcp_server_accept(int fd, short events, void* arg)
 
 	sockfd = accept(fd, (struct sockaddr*)&client, &len );
 	evutil_make_socket_nonblocking(sockfd);
-	tcp_server->msg_obj->new_accept(fd);
+	tcp_server.msg_obj->new_accept(fd);
 	struct event_base* base = (struct event_base*)arg;
 	//仅仅是为了动态创建一个event结构体
 	struct event *ev = event_new(NULL, -1, 0, NULL, NULL);
@@ -217,12 +214,7 @@ void tcp_server_accept(int fd, short events, void* arg)
 }
 void tcp_server_end()
 {
-	if (tcp_server != NULL) {
-		event_base_free(tcp_server->evt_base);
-		event_free(tcp_server->ev_listen);
-		free(tcp_server);
-		tcp_server = NULL;
-	}
+
 }
 
 
@@ -242,9 +234,8 @@ int tcp_client_start(const char *IP, int port)
 		printf("erro:%s connect fail\n", (char*)IP);
 		return false;
 	}
-	tcp_client = (tcp_client_t*)malloc(sizeof(tcp_client));
-	tcp_client->socket_fd = confd;
-	tcp_client->last_time = time(NULL);
+	tcp_client.socket_fd = confd;
+	tcp_client.last_time = time(NULL);
 
 	return confd;
 }
@@ -283,35 +274,27 @@ void* thread_function(void* arg)
 
 int set_client_call_function(int sfd, void* (*msg_call_function)(void *arg), void* (*err_call_function)())
 {
-	if (tcp_client == NULL)
-	{
-		printf("%s\n", "error:set client_call_function");
-		return false;
-	}
-	tcp_client->msg_call_function = msg_call_function;
-	tcp_client->err_call_function = err_call_function;
-	pthread_create(&tcp_client->pid , NULL, thread_function, (void*)tcp_client);
+
+	tcp_client.msg_call_function = msg_call_function;
+	tcp_client.err_call_function = err_call_function;
+	pthread_create(&tcp_client.pid , NULL, thread_function, (void*)&tcp_client);
 	return true;
 }
 int set_server_thread_pool(struct thread_pool **pool)
 {
-	tcp_server->pool = *pool;
+	tcp_server.pool = *pool;
 	return true;
 }
 
 int set_client_thread_pool(struct thread_pool **pool)
 {
-	tcp_client->pool = *pool;
+	tcp_client.pool = *pool;
 	return true;
 }
 
 void tcp_client_end()
 {
-	if (tcp_client != NULL)
-	{
-		free(tcp_client);
-		tcp_client = NULL;
-	}
+
 
 }
 
