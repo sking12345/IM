@@ -32,16 +32,15 @@ int main()
 	int sfd = tcp_client_start(ip, SERVER_PORT);
 	set_client_call_function(sfd, work, NULL);
 	set_client_thread_pool(&pool);
-	// while (1)
-	// {
-	// 	char buf[10] = {0x00};
-	// 	gets(buf);
-	// 	printf("%s\n", buf);
-	// 	client_send_msg(buf, strlen(buf));
-	// }
-	const char *buf = "ddd";
-	client_send_msg((char*)buf, strlen(buf));
-	sleep(100);
+
+	while (1)
+	{
+		char buf[10] = {0x00};
+		gets(buf);
+		printf("%s\n", buf);
+		client_send_msg(buf, strlen(buf));
+	}
+	sleep(5);
 	thread_pool_destroy(&pool);
 	tcp_client_end();
 

@@ -87,9 +87,9 @@ int server_send_msg(int fd, char * buf, int size)
 int client_send_msg(char * buf, int size)
 {
 	size_t m_size = sizeof(struct client_msg_list) + size;
-	struct client_msg_list *msg_list = (struct client_msg_list*)malloc(m_size);
+	struct client_msg_list *msg_list = (struct client_msg_list*)malloc(m_size + 1);
 	memset(msg_list, 0x00, m_size);
-	msg_list->buf_size = size;
+	msg_list->buf_size = size + 1;
 	msg_list->number = 0;
 	msg_list->send_fd = tcp_client.socket_fd;
 	msg_list->time = time(NULL);
