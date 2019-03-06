@@ -21,7 +21,7 @@
 #include <iostream>
 using namespace std;
 #define SEND_QUEUE_MAX 1000
-#define APK_SIZE 10
+#define APK_SIZE 100
 
 typedef struct apk {	//
 	int size;	//数据大小

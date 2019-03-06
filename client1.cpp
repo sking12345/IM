@@ -71,8 +71,8 @@ void* threadpool_function(void* arg) {
 	// printf("%d\n", id );
 	// tcp_client_start(id);
 	sleep(1);
-	for (int i = 0; i < 1000; ++i) {
-		printf("%d--%d\n", id, i);
+	for (int ii = 0; ii < 1000; ++ii) {
+		printf("%d--%d\n", id, ii);
 		send_test(id);
 
 	}
@@ -86,7 +86,7 @@ void* threadpool_function(void* arg) {
 int main() {
 
 	const char *ip = "127.0.0.1";
-	int count = 50;
+	int count = 100;
 	int *sfd = (int*)malloc(count * sizeof(int));
 
 	for (int i = 0; i < count; ++i) {
