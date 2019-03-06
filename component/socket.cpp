@@ -4,6 +4,8 @@ struct tcp_server tcp_server;
 struct tcp_client tcp_client;
 struct tcp_server_recve_buf tcp_server_recve_buf1;
 
+int test_size = 0;
+
 /**
  * [send_err: 发送错误回调]
  * @param fd [description]
@@ -24,8 +26,8 @@ int set_disable_nagle(int fd) {
 int get_send_buf_size(int cfd) {
 	int opt;
 	socklen_t len1 = sizeof(int);
-	if ((getsockopt(cfd, SOL_SOCKET, SO_SNDBUF, (char*)&opt, &len1)) == 0) {
-		//printf("SO_KEEPALIVE Value: %d\n", opt);
+	if ((getsockopt(cfd, SOL_SOCKET, SO_RCVBUF, (char*)&opt, &len1)) == 0) {
+		printf("SO_RCVBUF Value: %d\n", opt);
 		return opt;
 	}
 	return -1;
@@ -117,80 +119,124 @@ void* server_send_work(void* arg) {
 	return NULL;
 }
 
+void *server_recv_work(void *arg) {
+	struct server_recv * s_recv = (struct server_recv*)arg;
+	printf("%d\n", s_recv->fd);
+	if (s_recv->apk_data.status == 0x01) {
+		printf("%s\n", "new msg");
+		return NULL;
+	}
+	pthread_mutex_lock(&(tcp_server_recve_buf1.mutex));
+	map<int, struct apk_list_buf>::iterator iter = tcp_server_recve_buf1.rec_buf_map.find(s_recv->fd);
+	if (iter == tcp_server_recve_buf1.rec_buf_map.end()) {
+
+		struct apk_list_buf apk_list;
+		apk_list.data_buf = (char*)malloc(s_recv->apk_data.size + 1);
+		memset(apk_list.data_buf, 0x00, s_recv->apk_data.size + 1);
+		memcpy(apk_list.data_buf + s_recv->apk_data.number * APK_SIZE, s_recv->apk_data.buf, APK_SIZE);
+		tcp_server_recve_buf1.rec_buf_map.insert(pair<int, struct apk_list_buf>(s_recv->fd, apk_list));
+	} else {
+		struct apk_list_buf *apk_list = &iter->second;
+		if (s_recv->apk_data.status == 0x00) {
+			if (s_recv->apk_data.number == 0x00) {
+				if (apk_list->data_buf != NULL) {
+					free(apk_list->data_buf);
+					apk_list->data_buf = NULL;
+				}
+				apk_list->data_buf =  (char*)malloc(s_recv->apk_data.size + 1);
+				memset(apk_list->data_buf, 0x00, s_recv->apk_data.size + 1);
+			}
+			memcpy(apk_list->data_buf + s_recv->apk_data.number * APK_SIZE, s_recv->apk_data.buf, APK_SIZE);
+		} else if (s_recv->apk_data.status == 0x01) {
+			int residue = s_recv->apk_data.size - s_recv->apk_data.number * APK_SIZE;
+			if (residue > 0) {
+				memcpy(apk_list->data_buf + s_recv->apk_data.number * APK_SIZE, s_recv->apk_data.buf, residue);
+			} else {
+				memcpy(apk_list->data_buf + s_recv->apk_data.number * APK_SIZE, s_recv->apk_data.buf, APK_SIZE);
+			}
+			printf("%s\n", apk_list->data_buf);
+			free(apk_list->data_buf);
+			apk_list->data_buf = NULL;
+		}
+
+	}
+	pthread_mutex_unlock(&(tcp_server_recve_buf1.mutex));
+	return NULL;
+
+}
+
 void tcp_server_read(int fd, short events, void *arg) {
-	struct apk apk;
+	//struct apk apk;
+	struct server_recv server_recv;
+	server_recv.fd = fd;
 	struct event *ev = (struct event*)arg;
-	int len = read(fd, &apk, sizeof(struct apk));
+	int len = read(fd, &server_recv.apk_data, sizeof(struct apk));
 	if ( len <= 0 ) {
-		printf("%s\n", "colse");
+		//printf("%s\n", "colse");
 		pthread_mutex_lock(&(tcp_server_recve_buf1.mutex));
 		map<int, struct apk_list_buf>::iterator iter = tcp_server_recve_buf1.rec_buf_map.find(fd);
 		if (iter != tcp_server_recve_buf1.rec_buf_map.end()) {
 			tcp_server_recve_buf1.rec_buf_map.erase(iter);
 		}
 		if (tcp_server_recve_buf1.rec_buf_map.empty()) {
-			printf("%s\n", "empty()");
+			//printf("%s\n", "empty()");
 		}
 		close(event_get_fd(ev));
 		event_free(ev);
 		pthread_mutex_unlock(&(tcp_server_recve_buf1.mutex));
 		return ;
 	} else {
-		int size = get_send_buf_size(fd);
-		printf("get_send_buf_size::%d\n", size);
-		pthread_mutex_lock(&(tcp_server_recve_buf1.mutex));
-		printf("%d\n", apk.number);
-		if (tcp_server_recve_buf1.rec_buf_map.empty()) {
-			struct apk_list_buf apk_list;
-			apk_list.data_buf = (char*)malloc(apk.size + 1);
-			memset(apk_list.data_buf , 0x00, apk.size + 1);
-			memcpy(apk_list.data_buf + apk.number * APK_SIZE, apk.buf, APK_SIZE);
-			tcp_server_recve_buf1.rec_buf_map.insert(pair<int, struct apk_list_buf>(fd, apk_list));
-		} else {
-			map<int, struct apk_list_buf>::iterator iter = tcp_server_recve_buf1.rec_buf_map.find(fd);
-			if (iter ==  tcp_server_recve_buf1.rec_buf_map.end()) {
-				struct apk_list_buf apk_list;
-				apk_list.data_buf = (char*)malloc(apk.size + 1);
-				memset(apk_list.data_buf , 0x00, apk.size + 1);
-				memcpy(apk_list.data_buf + apk.number * APK_SIZE, apk.buf, APK_SIZE);
-				tcp_server_recve_buf1.rec_buf_map.insert(pair<int, struct apk_list_buf>(fd, apk_list));
-			}
+		test_size += server_recv.apk_data.size;
+		if (test_size > 64 * 1024 * 250) {
+			printf("%s\n", "---------");
+			return;
 		}
-		//------------
-
-		if (apk.number == 0x00) {
-			if (apk.status == 0x00) {
-				if (tcp_server_recve_buf1.rec_buf_map.empty()) {
-
-				} else {
-					map<int, struct apk_list_buf>::iterator iter = tcp_server_recve_buf1.rec_buf_map.find(fd);
-					struct apk_list_buf *apk_list = &iter->second;
-					int residue = apk.size - apk.number * APK_SIZE;
-					if (residue > 0) {
-						memcpy(apk_list->data_buf + apk.number * APK_SIZE, apk.buf, residue);
-					} else {
-						memcpy(apk_list->data_buf + apk.number * APK_SIZE, apk.buf, APK_SIZE);
-					}
-
-				}
-			} else if (apk.status == 0x01) {
-				printf("%s\n", "new msg");
-			}
+		printf("test_size::%d\n", test_size);
+		int size = get_send_buf_size(fd);
+		// printf("get_send_buf_size::%d\n", size);
+		//用线程池取读取数据
+		//server_recv_work((void*)&server_recv);
+		// thread_pool_add_job(tcp_server.pool, server_recv_work, (void*)&server_recv, sizeof(int));
+		struct server_recv * s_recv = (struct server_recv*)&server_recv;
+		printf("%d\n", s_recv->fd);
+		if (s_recv->apk_data.status == 0x01 && s_recv->apk_data.number == 0x00) {
+			printf("%s\n", "new msg");
+			return ;
+		}
+		pthread_mutex_lock(&(tcp_server_recve_buf1.mutex));
+		map<int, struct apk_list_buf>::iterator iter = tcp_server_recve_buf1.rec_buf_map.find(s_recv->fd);
+		if (iter == tcp_server_recve_buf1.rec_buf_map.end()) {
+			struct apk_list_buf apk_list;
+			apk_list.data_buf = (char*)malloc(s_recv->apk_data.size + 1);
+			memset(apk_list.data_buf, 0x00, s_recv->apk_data.size + 1);
+			memcpy(apk_list.data_buf + s_recv->apk_data.number * APK_SIZE, s_recv->apk_data.buf, APK_SIZE);
+			tcp_server_recve_buf1.rec_buf_map.insert(pair<int, struct apk_list_buf>(s_recv->fd, apk_list));
 		} else {
-			map<int, struct apk_list_buf>::iterator iter = tcp_server_recve_buf1.rec_buf_map.find(fd);
 			struct apk_list_buf *apk_list = &iter->second;
-			if (apk.status == 0x01) {
-				int residue = apk.size - apk.number * APK_SIZE;
-				if (residue > 0) {
-					memcpy(apk_list->data_buf + apk.number * APK_SIZE, apk.buf, residue);
-				} else {
-					memcpy(apk_list->data_buf + apk.number * APK_SIZE, apk.buf, APK_SIZE);
+			if (s_recv->apk_data.status == 0x00) {
+				if (s_recv->apk_data.number == 0x00) {
+					if (apk_list->data_buf != NULL) {
+						free(apk_list->data_buf);
+						apk_list->data_buf = NULL;
+					}
+					apk_list->data_buf =  (char*)malloc(s_recv->apk_data.size + 1);
+					memset(apk_list->data_buf, 0x00, s_recv->apk_data.size + 1);
 				}
+				memcpy(apk_list->data_buf + s_recv->apk_data.number * APK_SIZE, s_recv->apk_data.buf, APK_SIZE);
+			} else if (s_recv->apk_data.status == 0x01) {
+				int residue = s_recv->apk_data.size - s_recv->apk_data.number * APK_SIZE;
+				if (residue > 0) {
+					memcpy(apk_list->data_buf + s_recv->apk_data.number * APK_SIZE, s_recv->apk_data.buf, residue);
+				} else {
+					memcpy(apk_list->data_buf + s_recv->apk_data.number * APK_SIZE, s_recv->apk_data.buf, APK_SIZE);
+				}
+				test_size -= s_recv->apk_data.size;
+				printf("%s\n", "xx");
+				printf("%s\n", apk_list->data_buf);
 				free(apk_list->data_buf);
 				apk_list->data_buf = NULL;
-			} else if (apk.status == 0x00) {
-				memcpy(apk_list->data_buf + apk.number * APK_SIZE, apk.buf, APK_SIZE);
 			}
+
 		}
 		pthread_mutex_unlock(&(tcp_server_recve_buf1.mutex));
 	}
