@@ -12,6 +12,12 @@ void socket_send_err(int fd)
 	printf("%s:%d\n", "socket_send_err", fd);
 }
 
+int set_nagle(int fd, int on)
+{
+	setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (void *)&on, sizeof(on));
+	setsockopt( sock, IPPROTO_TCP, TCP_NODELAY, (void *)&on, sizeof(on));
+}
+
 
 int get_send_buf_size(int cfd)
 {

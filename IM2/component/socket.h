@@ -80,8 +80,14 @@ typedef struct tcp_client {
 
 
 int get_send_buf_size(int fd);	//获取发送缓冲区大小
-
-
+/**
+ * [set_nagle //设置tcp 的 nagle算法]
+ * 如果不禁用,则数据会大于1460(tcp) udp(1280) 才发送,会出现异常粘包现象
+ * @param  fd     [description]
+ * @param  on [ 若为1, 就会在套接字上禁用Nagle算法 ]
+ * @return        [description]
+ */
+int set_nagle(int fd,  int on);
 int tcp_server_init(int port, int listen_num);
 int tcp_server_start(int port, int listen_num);
 int tcp_server_send(int fd, char *buf, int size);
