@@ -2,44 +2,168 @@
 
 struct tcp_server tcp_server;
 struct tcp_client tcp_client;
+
+/**
+ * [send_err: 发送错误回调]
+ * @param fd [description]
+ */
+void socket_send_err(int fd)
+{
+	printf("%s:%d\n", "socket_send_err", fd);
+}
+
+
+int get_send_buf_size(int cfd)
+{
+	int opt;
+	socklen_t len1 = sizeof(int);
+	if ((getsockopt(cfd, SOL_SOCKET, SO_SNDBUF, (char*)&opt, &len1)) == 0) {
+		//printf("SO_KEEPALIVE Value: %d\n", opt);
+		return opt;
+	}
+	return -1;
+}
+
+//确认接受到消息
+void confirm_recv(int cfd, int apk_status)
+{
+	struct apk confirem_apk;
+	confirem_apk.number = 0x00;
+	confirem_apk.status = apk_status;
+}
+/**
+ * [server_send_work 服务器端发送书数据]
+ * @param arg [description]
+ */
+void* server_send_work(void* arg)
+{
+	int confd = *(int*)arg;
+	map<int, struct send_buf_list>::iterator iter = tcp_server.send_buf_map.find(confd);
+	if (iter == tcp_server.send_buf_map.end())
+	{
+		return NULL;
+	}
+
+	struct send_buf_list *slist = &iter->second;
+	list<struct send_buf>::iterator iter_list = slist->send_list.begin();
+
+	//发送完后就删除改
+	struct apk send_apk;
+	send_apk.size = iter_list->size;
+	int residue = send_apk.size % APK_SIZE;
+	int count = (send_apk.size - residue) / APK_SIZE;
+	char *send_buf = iter_list->buf;
+	int status;
+	if (residue > 0)
+	{
+		send_apk.status = 0x00;
+		for (int i = 0; i < count; ++i)
+		{
+			send_apk.number = i;
+			memset(send_apk.buf, 0x00, sizeof(send_apk.buf));
+			memcpy(send_apk.buf, (char*)send_buf + i * APK_SIZE, APK_SIZE);
+			status = write(confd, &send_apk, sizeof(send_apk));
+			if (status <= 0)
+			{
+				socket_send_err(confd);
+				return NULL;
+			}
+		}
+		send_apk.number = count;
+
+		send_apk.status = 0x01;
+		memset(send_apk.buf, 0x00, sizeof(send_apk.buf));
+		memcpy(send_apk.buf, (char*)send_buf + count * APK_SIZE, residue);
+		status = write(confd, &send_apk, sizeof(send_apk));
+		if (status <= 0)
+		{
+			socket_send_err(confd);
+			return NULL;
+		}
+
+	} else {
+		for (int i = 0; i < count; ++i)
+		{
+			send_apk.number = i;
+			memset(send_apk.buf, 0x00, sizeof(send_apk.buf));
+			if (i * APK_SIZE + APK_SIZE < send_apk.size)
+			{
+				memcpy(send_apk.buf, (char*)send_buf + i * APK_SIZE, APK_SIZE);
+			} else {
+				int opt = i * APK_SIZE;
+				memcpy(send_apk.buf, (char*)send_buf + opt, send_apk.size - opt);
+			}
+			if (i == count - 1)
+			{
+				send_apk.status = 0x01;
+			} else {
+				send_apk.status = 0x00;
+			}
+			status = write(confd, &send_apk, sizeof(send_apk));
+			if (status <= 0)
+			{
+				socket_send_err(confd);
+				return NULL;
+			}
+		}
+	}
+	slist->send_list.erase(iter_list);
+	return NULL;
+}
+
 void tcp_server_read(int fd, short events, void *arg) {
 	struct apk apk;
 	struct event *ev = (struct event*)arg;
 	int len = read(fd, &apk, sizeof(struct apk));
 	if ( len <= 0 ) {
 		printf("%s\n", "colse");
+		map<int, struct apk_list_buf>::iterator iter = tcp_server.rec_buf_map.find(fd);
+		if (iter != tcp_server.rec_buf_map.end()) {
+			struct apk_list_buf *apk_list_buf = &iter->second;
+			if (apk_list_buf->data_buf  != NULL) {
+				free(apk_list_buf->data_buf);
+				apk_list_buf->data_buf = NULL;
+			}
+			tcp_server.rec_buf_map.erase(fd);
+		}
 		close(event_get_fd(ev));
 		event_free(ev);
 		return ;
 	} else {
-		map<int, struct apk_list*>::iterator iter = tcp_server.apk_list_map.find(fd);
+		map<int, struct apk_list_buf>::iterator iter = tcp_server.rec_buf_map.find(fd);
 		if (apk.status == 0x01) {
-			if (iter == tcp_server.apk_list_map.end()) {
-				printf("%s\n", "once");
+			// printf("%s\n", "recv suceess");
+			if (iter == tcp_server.rec_buf_map.end()) {
+				//printf("%s\n", apk.buf);
 			} else {
-				struct apk_list *apk_lsit = iter->second;
+				struct apk_list_buf *apk_list_buf = &iter->second;
+				int residue = apk.size - apk.number * APK_SIZE;
+				memcpy(apk_list_buf->data_buf + apk.number * APK_SIZE, apk.buf, residue);
+				printf("%s\n", apk_list_buf->data_buf);
+				printf("%d\n", apk.size);
+				free(apk_list_buf->data_buf);	//接受完数据后释放资源
+				apk_list_buf->data_buf = NULL;
+
 			}
+
 		} else if (apk.status == 0x00) {
-			size_t apk_size = sizeof(struct apk);
-			struct apk *papk = (struct apk*)malloc(apk_size);
-			memset(papk, 0x00, apk_size);
-			memcpy(papk, &apk, apk_size);
-			struct apk_list *apk_lsit = (struct apk_list *)malloc(sizeof(struct apk_list));
-			apk_lsit->apk = papk;
-			apk_lsit->next = NULL;
-			apk_lsit->tail = apk_lsit;
-			if (iter == tcp_server.apk_list_map.end()) {
-				printf("%s\n", "dd");
-				tcp_server.apk_list_map.insert(pair<int, struct apk_list*>(fd, apk_lsit));
+			if (iter == tcp_server.rec_buf_map.end()) {
+				struct apk_list_buf apk_list_buf;
+				apk_list_buf.data_buf = (char*)malloc(apk.size + 1);
+				memset(apk_list_buf.data_buf, 0x00, apk.size + 1);
+				memcpy(apk_list_buf.data_buf + apk.number * APK_SIZE, apk.buf, APK_SIZE);
+				tcp_server.rec_buf_map.insert(pair<int, struct apk_list_buf>(fd, apk_list_buf));
 			} else {
-				struct apk_list *apk_lsit = iter->second;
-				apk_lsit->tail->next = apk_lsit;
-				apk_lsit->tail = apk_lsit;
-				printf("%s\n", "dd1");
+				struct apk_list_buf *apk_list_buf = &iter->second;
+				if (apk_list_buf->data_buf  == NULL)
+				{
+					apk_list_buf->data_buf = (char*)malloc(apk.size + 1);
+					memset(apk_list_buf->data_buf, 0x00, apk.size + 1);
+				}
+				memcpy(apk_list_buf->data_buf + apk.number * APK_SIZE, apk.buf, APK_SIZE);
 			}
 		}
 
-		printf("%s\n", "new msg");
 	}
 }
 
@@ -98,13 +222,67 @@ error:
 }
 int tcp_server_start(int port, int listen_num) {
 	int listener = tcp_server_init(port, listen_num);
+	if (tcp_server.pool == NULL)
+	{
+		tcp_server.pool = thread_pool_init(1, 1000);
+	}
+	tcp_server.status = 0x00;
 	tcp_server.evt_base = event_base_new();
 	tcp_server.ev_listen = event_new(tcp_server.evt_base, listener, EV_READ | EV_PERSIST, tcp_server_accept, (void*)tcp_server.evt_base);
 	event_add(tcp_server.ev_listen, NULL);
 	event_base_dispatch(tcp_server.evt_base);
 	return true;
 }
-
+/**
+ * [tcp_server_send 服务端发送数据]
+ * @param  fd   [description]
+ * @param  buf  [description]
+ * @param  size [description]
+ * @return      [description]
+ */
+int tcp_server_send(int fd, char *buf, int size)
+{
+	if (tcp_server.status == 0x01)
+	{
+		return -2;
+	}
+	if (size > get_send_buf_size(fd))
+	{
+		return -3;
+	}
+	map<int, struct send_buf_list>::iterator iter = tcp_server.send_buf_map.find(fd);
+	if (iter == tcp_server.send_buf_map.end())
+	{
+		struct send_buf sbuf ;
+		sbuf.size = size;
+		sbuf.status = 0x00;
+		sbuf.buf = (char*)malloc(size + 1);
+		memset(sbuf.buf, 0x00, size + 1);
+		memcpy(sbuf.buf, buf, size);
+		struct send_buf_list  slist;
+		slist.send_list.push_back(sbuf);
+		tcp_server.send_buf_map.insert(pair<int, struct send_buf_list>(fd, slist));
+	} else {
+		struct send_buf_list *slist = &iter->second;
+		if (slist->send_list.size() > SEND_QUEUE_MAX)
+		{
+			return -1;
+		}
+		struct send_buf sbuf ;
+		sbuf.size = size;
+		sbuf.status = 0x00;
+		sbuf.buf = (char*)malloc(size + 1);
+		memset(sbuf.buf, 0x00, size + 1);
+		memcpy(sbuf.buf, buf, size);
+		slist->send_list.push_back(sbuf);
+	}
+	thread_pool_add_job(tcp_server.pool, server_send_work, (void*)&fd, sizeof(int));
+	return true;
+}
+/**
+ * [tcp_server_end 服务器端结束]
+ * @return [description]
+ */
 int tcp_server_end() {
 	if (tcp_server.evt_base != NULL) {
 		event_base_free(tcp_server.evt_base);
@@ -112,6 +290,11 @@ int tcp_server_end() {
 	if (tcp_server.ev_listen != NULL) {
 		event_free(tcp_server.ev_listen);
 	}
+	if (tcp_server.pool != NULL)
+	{
+		thread_pool_destroy(&tcp_server.pool);
+	}
+
 	return true;
 }
 
@@ -132,11 +315,225 @@ int tcp_client_init(const char*ip, int port) {
 	tcp_client.last_time = time(NULL);
 	return confd;
 }
-int tcp_client_start(const char*ip, int port) {
-	int confd = tcp_client_init(ip, port);
-	return confd;
+
+/**
+ * 清空数据
+ */
+
+void tcp_client_clear(int fd)
+{
+	map<int, struct send_buf_list>::iterator iter = tcp_client.send_buf_map.find(fd);
+	if (iter != tcp_client.send_buf_map.end())
+	{
+		struct send_buf_list *slist = &iter->second;
+		list<struct send_buf>::iterator iter_list;
+
+		for (iter_list = slist->send_list.begin(); iter_list != slist->send_list.end(); iter_list++)
+		{
+			if (iter_list->buf != NULL)
+			{
+				free(iter_list->buf);
+				iter_list->buf = NULL;
+			}
+
+		}
+		slist->send_list.clear();
+		tcp_client.send_buf_map.erase(fd);
+	}
+	return;
 }
-int tcp_client_end() {
+
+
+
+
+void* client_send_work(void* arg)
+{
+	int confd = *(int*)arg;
+	map<int, struct send_buf_list>::iterator iter = tcp_client.send_buf_map.find(confd);
+	if (iter == tcp_client.send_buf_map.end())
+	{
+		return NULL;
+	}
+
+	struct send_buf_list *slist = &iter->second;
+	list<struct send_buf>::iterator iter_list = slist->send_list.begin();
+	//发送完后就删除改
+	struct apk send_apk;
+	send_apk.size = iter_list->size;
+	int residue = send_apk.size % APK_SIZE;
+	int count = (send_apk.size - residue) / APK_SIZE;
+	char *send_buf = iter_list->buf;
+	int status;
+	if (residue > 0)
+	{
+		send_apk.status = 0x00;
+		for (int i = 0; i < count; ++i)
+		{
+			send_apk.number = i;
+			memset(send_apk.buf, 0x00, sizeof(send_apk.buf));
+			memcpy(send_apk.buf, (char*)send_buf + i * APK_SIZE, APK_SIZE);
+			status = write(confd, &send_apk, sizeof(send_apk));
+			if (status <= 0)
+			{
+				socket_send_err(confd);
+				return NULL;
+			}
+		}
+		send_apk.number = count;
+		send_apk.status = 0x01;
+		memset(send_apk.buf, 0x00, sizeof(send_apk.buf));
+		memcpy(send_apk.buf, (char*)send_buf + count * APK_SIZE, residue);
+		status = write(confd, &send_apk, sizeof(send_apk));
+		if (status <= 0)
+		{
+			socket_send_err(confd);
+			return NULL;
+		}
+	} else {
+		for (int i = 0; i < count; ++i)
+		{
+			send_apk.number = i;
+			memset(send_apk.buf, 0x00, sizeof(send_apk.buf));
+			if (i * APK_SIZE + APK_SIZE < send_apk.size)
+			{
+				memcpy(send_apk.buf, (char*)send_buf + i * APK_SIZE, APK_SIZE);
+			} else {
+				int opt = i * APK_SIZE;
+				memcpy(send_apk.buf, (char*)send_buf + opt, send_apk.size - opt);
+			}
+			if (i == count - 1)
+			{
+				send_apk.status = 0x01;
+			} else {
+				send_apk.status = 0x00;
+			}
+			status = write(confd, &send_apk, sizeof(send_apk));
+			if (status <= 0)
+			{
+				socket_send_err(confd);
+				return NULL;
+			}
+		}
+	}
+	slist->send_list.erase(iter_list);
+	return NULL;
+}
+
+/**
+ * [tcp_client_recv_thread 客户端接受数据线程]
+ * @param arg [description]
+ */
+void* tcp_client_recv_thread(void* arg)
+{
+
+	int cfd = tcp_client.socket_fd;
+	char *buf = NULL;
+	while (1)
+	{
+		struct apk recv_apk;
+		int len = read(cfd, &recv_apk, sizeof(struct apk));
+		if (len > 0)
+		{
+			if (buf == NULL)
+			{
+				buf = (char*)malloc(recv_apk.size + 1);
+				memset(buf, 0x00, recv_apk.size + 1);
+			}
+			if (recv_apk.status == 0x00)
+			{
+				memcpy(buf + recv_apk.number * APK_SIZE, recv_apk.buf, APK_SIZE);
+			}
+			if (recv_apk.status == 0x01)
+			{
+				int residue = recv_apk.size - recv_apk.number * APK_SIZE;
+				memcpy(buf + recv_apk.number * APK_SIZE, recv_apk.buf, residue);
+
+				//printf("%s\n", buf);
+				free(buf);
+				buf = NULL;
+			}
+			if (recv_apk.status == 0x02)
+			{
+				// printf("%s\n", "confirm_recv sucess");
+			}
+		} else {
+			printf( "closed: %d\n", cfd);
+			close(cfd);
+			return NULL;
+		}
+	}
+	return NULL;
+}
+
+
+int tcp_client_start(int cfd) {
+	if (tcp_client.pool == NULL)
+	{
+		tcp_client.pool = thread_pool_init(1, 1000);
+	}
+	tcp_client.status = 0x00;
+	pthread_create(&tcp_client.pid , NULL, tcp_client_recv_thread, NULL);
+	return true;
+}
+
+
+
+/**
+ * [tcp_client_send 客户端发送数据]
+ * @param  fd   [description]
+ * @param  buf  [description]
+ * @param  size [description]
+ * @return      [description]
+ */
+int tcp_client_send(int fd, char *buf, int size)
+{
+	if (tcp_client.status == 0x01)
+	{
+		return -2;
+	}
+	if (size > get_send_buf_size(fd))
+	{
+		return -3;
+	}
+
+	map<int, struct send_buf_list>::iterator iter = tcp_client.send_buf_map.find(fd);
+	if (iter == tcp_client.send_buf_map.end())
+	{
+		struct send_buf sbuf ;
+		sbuf.size = size;
+		sbuf.status = 0x00;
+		sbuf.buf = (char*)malloc(size + 1);
+		memset(sbuf.buf, 0x00, size + 1);
+		memcpy(sbuf.buf, buf, size);
+		struct send_buf_list  slist;
+		slist.send_list.push_back(sbuf);
+		tcp_client.send_buf_map.insert(pair<int, struct send_buf_list>(fd, slist));
+	} else {
+		struct send_buf_list *slist = &iter->second;
+		if (slist->send_list.size() > SEND_QUEUE_MAX)
+		{
+			return -1;
+		}
+		struct send_buf sbuf ;
+		sbuf.size = size;
+		sbuf.status = 0x00;
+		sbuf.buf = (char*)malloc(size + 1);
+		memset(sbuf.buf, 0x00, size + 1);
+		memcpy(sbuf.buf, buf, size);
+		slist->send_list.push_back(sbuf);
+	}
+
+	thread_pool_add_job(tcp_client.pool, client_send_work, (void*)&fd, sizeof(int));
+	return true;
+}
+int tcp_client_end(int fd) {
+	tcp_client.status = 0x01;
+	sleep(2);
+	tcp_client_clear(tcp_client.socket_fd);
+	if (tcp_client.pool != NULL)
+	{
+		thread_pool_destroy(&tcp_client.pool);
+	}
 	close(tcp_client.socket_fd);
 	return true;
 }
