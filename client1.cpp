@@ -71,7 +71,7 @@ void* threadpool_function(void* arg) {
 	// printf("%d\n", id );
 	// tcp_client_start(id);
 	sleep(1);
-	for (int ii = 0; ii < 1000; ++ii) {
+	for (int ii = 0; ii < 10000; ++ii) {
 		printf("%d--%d\n", id, ii);
 		send_test(id);
 

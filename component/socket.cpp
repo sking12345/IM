@@ -2,9 +2,6 @@
 
 struct tcp_server tcp_server;
 struct tcp_client tcp_client;
-struct tcp_server_recve_buf tcp_server_recve_buf1;
-
-int test_size = 0;
 
 /**
  * [send_err: 发送错误回调]
@@ -119,126 +116,38 @@ void* server_send_work(void* arg) {
 	return NULL;
 }
 
-void *server_recv_work(void *arg) {
-	struct server_recv * s_recv = (struct server_recv*)arg;
-	printf("%d\n", s_recv->fd);
-	if (s_recv->apk_data.status == 0x01) {
-		printf("%s\n", "new msg");
-		return NULL;
-	}
-	pthread_mutex_lock(&(tcp_server_recve_buf1.mutex));
-	map<int, struct apk_list_buf>::iterator iter = tcp_server_recve_buf1.rec_buf_map.find(s_recv->fd);
-	if (iter == tcp_server_recve_buf1.rec_buf_map.end()) {
-
-		struct apk_list_buf apk_list;
-		apk_list.data_buf = (char*)malloc(s_recv->apk_data.size + 1);
-		memset(apk_list.data_buf, 0x00, s_recv->apk_data.size + 1);
-		memcpy(apk_list.data_buf + s_recv->apk_data.number * APK_SIZE, s_recv->apk_data.buf, APK_SIZE);
-		tcp_server_recve_buf1.rec_buf_map.insert(pair<int, struct apk_list_buf>(s_recv->fd, apk_list));
-	} else {
-		struct apk_list_buf *apk_list = &iter->second;
-		if (s_recv->apk_data.status == 0x00) {
-			if (s_recv->apk_data.number == 0x00) {
-				if (apk_list->data_buf != NULL) {
-					free(apk_list->data_buf);
-					apk_list->data_buf = NULL;
-				}
-				apk_list->data_buf =  (char*)malloc(s_recv->apk_data.size + 1);
-				memset(apk_list->data_buf, 0x00, s_recv->apk_data.size + 1);
-			}
-			memcpy(apk_list->data_buf + s_recv->apk_data.number * APK_SIZE, s_recv->apk_data.buf, APK_SIZE);
-		} else if (s_recv->apk_data.status == 0x01) {
-			int residue = s_recv->apk_data.size - s_recv->apk_data.number * APK_SIZE;
-			if (residue > 0) {
-				memcpy(apk_list->data_buf + s_recv->apk_data.number * APK_SIZE, s_recv->apk_data.buf, residue);
-			} else {
-				memcpy(apk_list->data_buf + s_recv->apk_data.number * APK_SIZE, s_recv->apk_data.buf, APK_SIZE);
-			}
-			printf("%s\n", apk_list->data_buf);
-			free(apk_list->data_buf);
-			apk_list->data_buf = NULL;
-		}
-
-	}
-	pthread_mutex_unlock(&(tcp_server_recve_buf1.mutex));
-	return NULL;
-
-}
 
 void tcp_server_read(int fd, short events, void *arg) {
-	//struct apk apk;
-	struct server_recv server_recv;
-	server_recv.fd = fd;
+	struct apk apk_data;
 	struct event *ev = (struct event*)arg;
-	int len = read(fd, &server_recv.apk_data, sizeof(struct apk));
+	int len = read(fd, &apk_data, sizeof(struct apk));
 	if ( len <= 0 ) {
-		//printf("%s\n", "colse");
-		pthread_mutex_lock(&(tcp_server_recve_buf1.mutex));
-		map<int, struct apk_list_buf>::iterator iter = tcp_server_recve_buf1.rec_buf_map.find(fd);
-		if (iter != tcp_server_recve_buf1.rec_buf_map.end()) {
-			tcp_server_recve_buf1.rec_buf_map.erase(iter);
-		}
-		if (tcp_server_recve_buf1.rec_buf_map.empty()) {
-			//printf("%s\n", "empty()");
-		}
+		printf("%s\n", "colse");
 		close(event_get_fd(ev));
 		event_free(ev);
-		pthread_mutex_unlock(&(tcp_server_recve_buf1.mutex));
+		struct apk_list_buf *node = NULL;
+		struct apk_list_buf *apk_list = tcp_server.head;
+		while (apk_list != NULL) {
+			node = apk_list;
+			printf("%s\n", node->apk_list->buf);
+			apk_list = apk_list->next;
+			free(node);
+			node = NULL;
+		}
+		tcp_server.head = tcp_server.tail = NULL;
 		return ;
 	} else {
-		test_size += server_recv.apk_data.size;
-		if (test_size > 64 * 1024 * 250) {
-			printf("%s\n", "---------");
-			return;
-		}
-		printf("test_size::%d\n", test_size);
-		int size = get_send_buf_size(fd);
-		// printf("get_send_buf_size::%d\n", size);
-		//用线程池取读取数据
-		//server_recv_work((void*)&server_recv);
-		// thread_pool_add_job(tcp_server.pool, server_recv_work, (void*)&server_recv, sizeof(int));
-		struct server_recv * s_recv = (struct server_recv*)&server_recv;
-		printf("%d\n", s_recv->fd);
-		if (s_recv->apk_data.status == 0x01 && s_recv->apk_data.number == 0x00) {
-			printf("%s\n", "new msg");
-			return ;
-		}
-		pthread_mutex_lock(&(tcp_server_recve_buf1.mutex));
-		map<int, struct apk_list_buf>::iterator iter = tcp_server_recve_buf1.rec_buf_map.find(s_recv->fd);
-		if (iter == tcp_server_recve_buf1.rec_buf_map.end()) {
-			struct apk_list_buf apk_list;
-			apk_list.data_buf = (char*)malloc(s_recv->apk_data.size + 1);
-			memset(apk_list.data_buf, 0x00, s_recv->apk_data.size + 1);
-			memcpy(apk_list.data_buf + s_recv->apk_data.number * APK_SIZE, s_recv->apk_data.buf, APK_SIZE);
-			tcp_server_recve_buf1.rec_buf_map.insert(pair<int, struct apk_list_buf>(s_recv->fd, apk_list));
+		struct apk_list_buf *apk_list = (struct apk_list_buf*)malloc(sizeof(struct apk_list_buf));
+		apk_list->apk_list = (struct apk*)malloc(sizeof(struct apk));
+		memset(apk_list->apk_list, 0x00, sizeof(struct apk));
+		memcpy(apk_list->apk_list, &apk_data, sizeof(struct apk));
+		apk_list->next = NULL;
+		if (tcp_server.head == NULL) {
+			tcp_server.head = tcp_server.tail = apk_list;
 		} else {
-			struct apk_list_buf *apk_list = &iter->second;
-			if (s_recv->apk_data.status == 0x00) {
-				if (s_recv->apk_data.number == 0x00) {
-					if (apk_list->data_buf != NULL) {
-						free(apk_list->data_buf);
-						apk_list->data_buf = NULL;
-					}
-					apk_list->data_buf =  (char*)malloc(s_recv->apk_data.size + 1);
-					memset(apk_list->data_buf, 0x00, s_recv->apk_data.size + 1);
-				}
-				memcpy(apk_list->data_buf + s_recv->apk_data.number * APK_SIZE, s_recv->apk_data.buf, APK_SIZE);
-			} else if (s_recv->apk_data.status == 0x01) {
-				int residue = s_recv->apk_data.size - s_recv->apk_data.number * APK_SIZE;
-				if (residue > 0) {
-					memcpy(apk_list->data_buf + s_recv->apk_data.number * APK_SIZE, s_recv->apk_data.buf, residue);
-				} else {
-					memcpy(apk_list->data_buf + s_recv->apk_data.number * APK_SIZE, s_recv->apk_data.buf, APK_SIZE);
-				}
-				test_size -= s_recv->apk_data.size;
-				printf("%s\n", "xx");
-				printf("%s\n", apk_list->data_buf);
-				free(apk_list->data_buf);
-				apk_list->data_buf = NULL;
-			}
-
+			tcp_server.tail->next = apk_list;
+			tcp_server.tail = apk_list;
 		}
-		pthread_mutex_unlock(&(tcp_server_recve_buf1.mutex));
 	}
 }
 
@@ -304,14 +213,17 @@ int tcp_server_start(int port, int listen_num) {
 	if (tcp_server.pool == NULL) {
 		tcp_server.pool = thread_pool_init(1, 1000);
 	}
-	if (pthread_mutex_init(&tcp_server_recve_buf1.mutex, NULL)) {
-		printf("failed to init mutex!\n");
-		return -1;
-	}
+	// if (pthread_mutex_init(&tcp_server_recve_buf1.mutex, NULL)) {
+	// 	printf("failed to init mutex!\n");
+	// 	return -1;
+	// }
 	// if (pthread_cond_init(&(tcp_server_recve_buf.cond), NULL)) {
 	// 	printf("failed to init cond!\n");
 	// 	return -1;
 	// }
+
+
+	tcp_server.head = tcp_server.tail = NULL;
 	tcp_server.status = 0x00;
 	tcp_server.evt_base = event_base_new();
 	tcp_server.ev_listen = event_new(tcp_server.evt_base, listener, EV_READ | EV_PERSIST, tcp_server_accept, (void*)tcp_server.evt_base);

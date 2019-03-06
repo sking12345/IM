@@ -32,13 +32,10 @@ typedef struct apk {	//
 } apk_t;
 
 typedef struct apk_list_buf {	//用于接收数据
-	char *data_buf;
+	struct apk *apk_list;
+	struct apk_list_buf *next;
 } apk_list_buf_t;
 
-typedef struct server_recv {
-	int fd;
-	struct apk apk_data;
-} server_recv_t;
 
 typedef struct send_buf {
 	int size;
@@ -57,11 +54,11 @@ typedef struct server_fds {
 	void *args;
 } server_fds_t;
 
-typedef struct tcp_server_recve_buf {
-	map<int, struct apk_list_buf> rec_buf_map;		//应采用锁机制
-	pthread_mutex_t mutex;
-	//pthread_cond_t cond;
-} tcp_server_recve_buf;
+// typedef struct tcp_server_recve_buf {
+// 	map<int, struct apk_list_buf> rec_buf_map;		//应采用锁机制
+// 	pthread_mutex_t mutex;
+// 	//pthread_cond_t cond;
+// } tcp_server_recve_buf;
 
 
 typedef struct tcp_server {
@@ -72,6 +69,8 @@ typedef struct tcp_server {
 	void* (*msg_call_function)(void *arg);
 	void* (*err_call_function)(int fd);
 	list<struct server_fds> fds;
+	struct apk_list_buf *head;
+	struct apk_list_buf *tail;
 	map<int, struct send_buf_list> send_buf_map;	//发送数据对列
 } tcp_server_t;
 
