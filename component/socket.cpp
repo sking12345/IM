@@ -126,11 +126,6 @@ void tcp_server_read(int fd, short events, void *arg) {
 		//pthread_mutex_lock(&(tcp_server_recve_buf1.mutex));
 		map<int, struct apk_list_buf>::iterator iter = tcp_server_recve_buf1.rec_buf_map.find(fd);
 		if (iter != tcp_server_recve_buf1.rec_buf_map.end()) {
-			struct apk_list_buf *apk_list_buf = &iter->second;
-			if (apk_list_buf->data_buf  != NULL) {
-				free(apk_list_buf->data_buf);
-				apk_list_buf->data_buf = NULL;
-			}
 			tcp_server_recve_buf1.rec_buf_map.erase(iter);
 		}
 		if (tcp_server_recve_buf1.rec_buf_map.empty()) {
