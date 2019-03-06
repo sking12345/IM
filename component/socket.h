@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <netinet/tcp.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -20,7 +21,7 @@
 #include <iostream>
 using namespace std;
 #define SEND_QUEUE_MAX 1000
-#define APK_SIZE 1024
+#define APK_SIZE 10
 
 typedef struct apk {	//
 	int size;	//数据大小
@@ -35,15 +36,13 @@ typedef struct apk_list_buf {	//用于接收数据
 } apk_list_buf_t;
 
 
-typedef struct send_buf
-{
+typedef struct send_buf {
 	int size;
 	int status;
 	char *buf;
 } send_buf_t;
 
-typedef struct send_buf_list
-{
+typedef struct send_buf_list {
 	list<struct send_buf> send_list;
 } send_list_t;
 
@@ -54,6 +53,12 @@ typedef struct server_fds {
 	void *args;
 } server_fds_t;
 
+typedef struct tcp_server_recve_buf {
+	map<int, struct apk_list_buf> rec_buf_map;		//应采用锁机制
+	pthread_mutex_t mutex;
+	//pthread_cond_t cond;
+} tcp_server_recve_buf;
+
 
 typedef struct tcp_server {
 	int status;
@@ -63,12 +68,11 @@ typedef struct tcp_server {
 	void* (*msg_call_function)(void *arg);
 	void* (*err_call_function)(int fd);
 	list<struct server_fds> fds;
-	map<int, struct apk_list_buf> rec_buf_map;
 	map<int, struct send_buf_list> send_buf_map;	//发送数据对列
 } tcp_server_t;
 
 typedef struct tcp_client {
-	int socket_fd;
+	//int socket_fd;
 	int last_time;
 	int status;
 	pthread_t pid;
@@ -81,13 +85,13 @@ typedef struct tcp_client {
 
 int get_send_buf_size(int fd);	//获取发送缓冲区大小
 /**
- * [set_nagle //设置tcp 的 nagle算法]
+ * [set_nagle //禁用tcp 的 nagle算法,数据立即发送]
  * 如果不禁用,则数据会大于1460(tcp) udp(1280) 才发送,会出现异常粘包现象
  * @param  fd     [description]
  * @param  on [ 若为1, 就会在套接字上禁用Nagle算法 ]
  * @return        [description]
  */
-int set_nagle(int fd,  int on);
+int set_disable_nagle(int fd);
 int tcp_server_init(int port, int listen_num);
 int tcp_server_start(int port, int listen_num);
 int tcp_server_send(int fd, char *buf, int size);
