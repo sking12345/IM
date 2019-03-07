@@ -8,10 +8,12 @@ using namespace std;
 
 void socket_send_err1(int fd) {
 	printf("%s\n", "ddd");
+	close(fd);
+	return ;
 }
 
 
-void *send_test(int confd) {
+int send_test(int confd) {
 	const char *str_buf1 = "nddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnxd";
 	printf("str_buf1:%ld\n", strlen(str_buf1) );
 	struct apk send_apk;
@@ -26,20 +28,20 @@ void *send_test(int confd) {
 			send_apk.number = i;
 			memset(send_apk.buf, 0x00, sizeof(send_apk.buf));
 			memcpy(send_apk.buf, (char*)send_buf + i * APK_SIZE, APK_SIZE);
-			status = send(confd, &send_apk, sizeof(send_apk), 0);
-			if (status <= 0) {
+			status = write(confd, &send_apk, sizeof(send_apk));
+			if (status < 0) {
 				socket_send_err1(confd);
-				return NULL;
+				return -1;
 			}
 		}
 		send_apk.number = count;
 		send_apk.status = 0x01;
 		memset(send_apk.buf, 0x00, sizeof(send_apk.buf));
 		memcpy(send_apk.buf, (char*)send_buf + count * APK_SIZE, residue);
-		status = send(confd, &send_apk, sizeof(send_apk), 0);
-		if (status <= 0) {
+		status = write(confd, &send_apk, sizeof(send_apk));
+		if (status < 0) {
 			socket_send_err1(confd);
-			return NULL;
+			return -1;
 		}
 	} else {
 		for (int i = 0; i < count; ++i) {
@@ -56,28 +58,29 @@ void *send_test(int confd) {
 			} else {
 				send_apk.status = 0x00;
 			}
-			status = send(confd, &send_apk, sizeof(send_apk), 0);
-			if (status <= 0) {
+			status = write(confd, &send_apk, sizeof(send_apk));
+			if (status < 0) {
 				socket_send_err1(confd);
-				return NULL;
+				return -1;
 			}
 		}
 	}
-	return NULL;
+	return 1;
 }
 
 void* threadpool_function(void* arg) {
 	int id = *(int*)arg;
-	// printf("%d\n", id );
-	// tcp_client_start(id);
 	sleep(1);
-	for (int ii = 0; ii < 10000; ++ii) {
-		printf("%d--%d\n", id, ii);
-		send_test(id);
+	for (int ii = 0; ii < 1000; ++ii) {
+		if (send_test(id) == -1)
+		{
+			printf("xxxxdddddd---%d\n", id);
+			return NULL;
 
+		}
 	}
-	// sleep(10);
-
+	close(id);
+	// pthread_exit(NULL);
 	return NULL;
 }
 
@@ -88,17 +91,24 @@ int main() {
 	const char *ip = "127.0.0.1";
 	int count = 250;
 	int *sfd = (int*)malloc(count * sizeof(int));
-
+	pthread_t *pid = (pthread_t*)malloc(sizeof(pthread_t) * count);
 	for (int i = 0; i < count; ++i) {
 		sfd[i] = tcp_client_init(ip, PORT);
 		set_disable_nagle(sfd[i]);
-		pthread_t pid;
-		pthread_create(&pid, NULL, threadpool_function, (void *)&sfd[i]);
+		pthread_create(&pid[i], NULL, threadpool_function, (void *)&sfd[i]);
+	}
+	printf("start...\n");
+	for (int i = 0; i < count; ++i)
+	{
+
+		printf("%s\n", "xxx");
+		pthread_join(pid[i], NULL);
 	}
 	printf("%s\n", "end");
-	sleep(5);
+	sleep(25000);
 	free(sfd);
 	sfd = NULL;
+	printf("%s\n", "end");
 	return 0;
 }
 

@@ -21,14 +21,15 @@
 #include <iostream>
 using namespace std;
 #define SEND_QUEUE_MAX 1000
-#define APK_SIZE 1400
+#define APK_SIZE 100
+#define APK_MAX_SIZE  10
 
 typedef struct apk {	//
 	int size;	//数据大小
 	int number;	//第多少次数据包
 	int status;	//状态 0x00:未接受完,0x01:数据接受完毕,0x02:确认接受完毕数据
 	int verify;	//检验数据包是否正常
-	char buf[APK_SIZE];
+	char buf[APK_SIZE + 1];
 } apk_t;
 
 typedef struct apk_list_buf {	//用于接收数据
@@ -43,6 +44,12 @@ typedef struct send_buf {
 	char *buf;
 } send_buf_t;
 
+typedef struct recv_buf_list {
+	int apk_count;
+	list<struct apk> recv_list;
+} recv_buf_list_t;
+
+
 typedef struct send_buf_list {
 	list<struct send_buf> send_list;
 } send_list_t;
@@ -54,12 +61,6 @@ typedef struct server_fds {
 	void *args;
 } server_fds_t;
 
-// typedef struct tcp_server_recve_buf {
-// 	map<int, struct apk_list_buf> rec_buf_map;		//应采用锁机制
-// 	pthread_mutex_t mutex;
-// 	//pthread_cond_t cond;
-// } tcp_server_recve_buf;
-
 
 typedef struct tcp_server {
 	int status;
@@ -69,8 +70,7 @@ typedef struct tcp_server {
 	void* (*msg_call_function)(void *arg);
 	void* (*err_call_function)(int fd);
 	list<struct server_fds> fds;
-	struct apk_list_buf *head;
-	struct apk_list_buf *tail;
+	map<int, struct recv_buf_list>  recv_buf_map;
 	map<int, struct send_buf_list> send_buf_map;	//发送数据对列
 } tcp_server_t;
 

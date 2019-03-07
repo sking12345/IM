@@ -14,8 +14,11 @@ void socket_send_err(int fd) {
 
 int set_disable_nagle(int fd) {
 	int on = 1;
+	int nNetTimeout = 1000;
 	setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (void *)&on, sizeof(on));
-	setsockopt( fd, IPPROTO_TCP, TCP_NODELAY, (void *)&on, sizeof(on));
+	setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (void *)&on, sizeof(on));
+	setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (void*)&nNetTimeout, sizeof(int));
+	setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (void *)&nNetTimeout, sizeof(int));
 	return true;
 }
 
@@ -31,8 +34,8 @@ int get_send_buf_size(int cfd) {
 }
 
 int set_socket_buf_size(int socket_fd) {
-	int nRcvBufferLen = 64 * 1024 ;
-	int nSndBufferLen = 8 * 1024 * 1024;
+	int nRcvBufferLen = 120 * 1024 * 1024  ;
+	int nSndBufferLen = 64 * 1024 * 1024;
 	int nLen          = sizeof(int);
 
 	setsockopt(socket_fd, SOL_SOCKET, SO_SNDBUF, (char*)&nSndBufferLen, nLen);
@@ -122,32 +125,70 @@ void tcp_server_read(int fd, short events, void *arg) {
 	struct event *ev = (struct event*)arg;
 	int len = read(fd, &apk_data, sizeof(struct apk));
 	if ( len <= 0 ) {
-		printf("%s\n", "colse");
+		printf("%d %s\n", fd, "--------colse");
+		map<int, struct recv_buf_list>::iterator iter = tcp_server.recv_buf_map.find(fd);
+		if (iter != tcp_server.recv_buf_map.end())
+		{
+			struct recv_buf_list *recv_buf_list = &iter->second;
+			recv_buf_list->recv_list.clear();
+			tcp_server.recv_buf_map.erase(iter);
+		}
 		close(event_get_fd(ev));
 		event_free(ev);
-		struct apk_list_buf *node = NULL;
-		struct apk_list_buf *apk_list = tcp_server.head;
-		while (apk_list != NULL) {
-			node = apk_list;
-			printf("%s\n", node->apk_list->buf);
-			apk_list = apk_list->next;
-			free(node);
-			node = NULL;
-		}
-		tcp_server.head = tcp_server.tail = NULL;
 		return ;
 	} else {
-		struct apk_list_buf *apk_list = (struct apk_list_buf*)malloc(sizeof(struct apk_list_buf));
-		apk_list->apk_list = (struct apk*)malloc(sizeof(struct apk));
-		memset(apk_list->apk_list, 0x00, sizeof(struct apk));
-		memcpy(apk_list->apk_list, &apk_data, sizeof(struct apk));
-		apk_list->next = NULL;
-		if (tcp_server.head == NULL) {
-			tcp_server.head = tcp_server.tail = apk_list;
-		} else {
-			tcp_server.tail->next = apk_list;
-			tcp_server.tail = apk_list;
+		get_send_buf_size(fd);
+		map<int, struct recv_buf_list>::iterator iter = tcp_server.recv_buf_map.find(fd);
+		if (apk_data.status !=  0x00 && apk_data.status !=  0x01 && apk_data.status !=  0x02)
+		{
+			printf("%s\n", "errorrrr");
+			if (iter != tcp_server.recv_buf_map.end())
+			{
+				struct recv_buf_list *recv_buf_list = &iter->second;
+				recv_buf_list->recv_list.clear();
+				tcp_server.recv_buf_map.erase(iter);
+			}
+			close(event_get_fd(ev));
+			event_free(ev);
+			return ;
 		}
+		if (apk_data.status == 0x01 && apk_data.number == 0x00) {
+			printf("%s\n", "new msg1" );
+			return;
+		}
+		//map<int, struct recv_buf_list>::iterator iter = tcp_server.recv_buf_map.find(fd);
+		if (iter == tcp_server.recv_buf_map.end())
+		{
+			struct recv_buf_list recv_buf_list;
+			recv_buf_list.apk_count = 1;
+			recv_buf_list.recv_list.push_back(apk_data);
+			tcp_server.recv_buf_map.insert(pair<int, struct recv_buf_list>(fd, recv_buf_list));
+		} else {
+			struct recv_buf_list *recv_buf_list = &iter->second;
+			if (recv_buf_list->apk_count >= APK_MAX_SIZE)
+			{
+				recv_buf_list->recv_list.clear();
+				return;
+			}
+			if (apk_data.number == 0x00)
+			{
+				recv_buf_list->apk_count++;
+			}
+			recv_buf_list->recv_list.push_back(apk_data);
+			++recv_buf_list->apk_count;
+		}
+		if (apk_data.status == 0x01)
+		{
+
+			map<int, struct recv_buf_list>::iterator iter1 = tcp_server.recv_buf_map.find(fd);
+			struct recv_buf_list *recv_buf_list = &iter1->second;
+			recv_buf_list->apk_count -= recv_buf_list->recv_list.size();
+			recv_buf_list->recv_list.clear();
+			--recv_buf_list->apk_count;
+			printf("%s\n", apk_data.buf );
+			return;
+		}
+
 	}
 }
 
@@ -158,9 +199,9 @@ void tcp_server_accept(int fd, short events, void* arg) {
 	socklen_t len = sizeof(client);
 	sockfd = accept(fd, (struct sockaddr*)&client, &len );
 	evutil_make_socket_nonblocking(sockfd);
-	//tcp_server.msg_obj->new_accept(fd);
-	// printf("%s\n", "new accept" );
+	printf("%s\n", "new accept" );
 	set_disable_nagle(fd);
+	set_socket_buf_size(fd);
 	struct event_base* base = (struct event_base*)arg;
 	//仅仅是为了动态创建一个event结构体
 	struct event *ev = event_new(NULL, -1, 0, NULL, NULL);
@@ -189,10 +230,10 @@ int tcp_server_init(int port, int listen_num) {
 	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = 0;
 	sin.sin_port = htons(port);
-	set_socket_buf_size(listener);
+
 	if ( bind(listener, (struct sockaddr*)&sin, sizeof(struct sockaddr)) < 0 )
 		goto error;
-
+	set_socket_buf_size(listener);
 	if ( listen(listener, listen_num) < 0)
 		goto error;
 
@@ -211,19 +252,8 @@ int tcp_server_start(int port, int listen_num) {
 
 	set_disable_nagle(listener);
 	if (tcp_server.pool == NULL) {
-		tcp_server.pool = thread_pool_init(1, 1000);
+		tcp_server.pool = thread_pool_init(10, 1000);
 	}
-	// if (pthread_mutex_init(&tcp_server_recve_buf1.mutex, NULL)) {
-	// 	printf("failed to init mutex!\n");
-	// 	return -1;
-	// }
-	// if (pthread_cond_init(&(tcp_server_recve_buf.cond), NULL)) {
-	// 	printf("failed to init cond!\n");
-	// 	return -1;
-	// }
-
-
-	tcp_server.head = tcp_server.tail = NULL;
 	tcp_server.status = 0x00;
 	tcp_server.evt_base = event_base_new();
 	tcp_server.ev_listen = event_new(tcp_server.evt_base, listener, EV_READ | EV_PERSIST, tcp_server_accept, (void*)tcp_server.evt_base);
