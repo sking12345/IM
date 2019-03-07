@@ -20,9 +20,8 @@
 #include "thread_pool.h"
 #include <iostream>
 using namespace std;
-#define SEND_QUEUE_MAX 1000
-#define APK_SIZE 100
-#define APK_MAX_SIZE  10
+#define QUEUE_MAX 10
+#define APK_SIZE 10
 
 typedef struct apk {	//
 	int size;	//数据大小
@@ -45,10 +44,15 @@ typedef struct send_buf {
 } send_buf_t;
 
 typedef struct recv_buf_list {
-	int apk_count;
 	list<struct apk> recv_list;
 } recv_buf_list_t;
 
+typedef struct test_thread_read
+{
+	int fd;
+	short events;
+	struct event *ev;
+} test_thread_read_t;
 
 typedef struct send_buf_list {
 	list<struct send_buf> send_list;
@@ -67,20 +71,20 @@ typedef struct tcp_server {
 	struct event* ev_listen;
 	struct event_base* evt_base;
 	struct thread_pool* pool;
-	void* (*msg_call_function)(void *arg);
-	void* (*err_call_function)(int fd);
+	void* (*data_call)(int fd, void *arg);	//完整数据回调函数
+	void* (*apk_call)(int fd, struct apk*);	//分包回调函数
+	void* (*abnormal)(int fd);	//异常回调han sh
 	list<struct server_fds> fds;
 	map<int, struct recv_buf_list>  recv_buf_map;
 	map<int, struct send_buf_list> send_buf_map;	//发送数据对列
 } tcp_server_t;
 
 typedef struct tcp_client {
-	//int socket_fd;
-	int last_time;
 	int status;
 	pthread_t pid;
-	void* (*msg_call_function)(void *arg);
-	void* (*err_call_function)(int fd);
+	void* (*data_call)(int fd, void *arg);	//完整数据回调函数
+	void* (*apk_call)(int fd, struct apk*);	//分包回调函数
+	void* (*abnormal)(int fd);	//异常回调han sh
 	map<int, struct send_buf_list> send_buf_map;	//发送数据对列
 	struct thread_pool* pool;
 } tcp_client_t;
@@ -96,8 +100,9 @@ int get_send_buf_size(int fd);	//获取发送缓冲区大小
  */
 int set_disable_nagle(int fd);
 int tcp_server_init(int port, int listen_num);
-int tcp_server_start(int port, int listen_num);
+int tcp_server_start(int port, int listen_num, int thread_num);
 int tcp_server_send(int fd, char *buf, int size);
+int tcp_server_call_(void* (*data_call)(int fd, void *arg), void* (*apk_call)(int fd, void *arg), void* (*abnormal)(int fd));
 int tcp_server_end();
 
 int tcp_client_init(const char*ip, int port);

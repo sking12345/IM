@@ -15,7 +15,7 @@ void socket_send_err1(int fd) {
 
 int send_test(int confd) {
 	const char *str_buf1 = "nddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnnddddnxd";
-	printf("str_buf1:%ld\n", strlen(str_buf1) );
+	// printf("str_buf1:%ld\n", strlen(str_buf1) );
 	struct apk send_apk;
 	send_apk.size = strlen(str_buf1);
 	int residue = send_apk.size % APK_SIZE;
