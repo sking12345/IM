@@ -50,7 +50,7 @@ void confirm_recv(int cfd, int apk_status) {
 }
 
 
-int tcp_server_call_(void* (*data_call)(int fd, void *arg), void* (*apk_call)(int fd, struct apk*recv_apk), void* (*abnormal)(int fd))
+int tcp_server_call(void* (*data_call)(int fd, void *arg), void* (*apk_call)(int fd, struct apk*recv_apk), void* (*abnormal)(int fd))
 {
 	tcp_server.data_call = data_call;
 	tcp_server.apk_call = apk_call;
@@ -151,7 +151,7 @@ void *tcp_server_thread_recv(void * arg)
 }
 
 
-void tcp_server_read(int fd, short events, void *arg) {
+void tcp_server_read1(int fd, short events, void *arg) {
 
 	printf("%d\n", fd);
 	struct test_thread_read test;
@@ -168,7 +168,7 @@ void tcp_server_read(int fd, short events, void *arg) {
 
 
 
-void tcp_server_read1(int fd, short events, void *arg) {
+void tcp_server_read(int fd, short events, void *arg) {
 	struct apk apk_data;
 	struct event *ev = (struct event*)arg;
 	int len = read(fd, &apk_data, sizeof(struct apk));
@@ -247,7 +247,7 @@ void tcp_server_accept(int fd, short events, void* arg) {
 	struct event *ev = event_new(NULL, -1, 0, NULL, NULL);
 	//将动态创建的结构体作为event的回调参数
 	event_assign(ev, base, sockfd, EV_READ | EV_PERSIST,
-	             tcp_server_read, (void*)ev);
+	             tcp_server_read, NULL);
 
 	event_add(ev, NULL);
 
