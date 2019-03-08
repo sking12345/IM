@@ -24,7 +24,7 @@ void accept_cb(int fd, short events, void* arg)
 	evutil_make_socket_nonblocking(sockfd);
 
 	printf("accept a client %d\n", sockfd);
-	struct server_t*pserver = (struct server_t*)arg;
+	struct server_base *pserver = (struct server_base *)arg;
 	// struct event_base* base = (event_base*)arg;
 	struct server_accept *paccept = server_accept_new();
 	if (paccept == NULL)
@@ -59,7 +59,7 @@ void socket_read_cb(int fd, short events, void *arg)
 
 }
 typedef struct sockaddr SA;
-struct server_t* tcp_server_init(int port, int listen_num)
+struct server_base * tcp_server_init(int port, int listen_num)
 {
 	int errno_save;
 	evutil_socket_t listener;
@@ -92,7 +92,7 @@ struct server_t* tcp_server_init(int port, int listen_num)
 		return NULL;
 
 	}
-	struct server_t*pserver = (struct server_t*)malloc(sizeof(struct server_t));
+	struct server_base *pserver = (struct server_base *)malloc(sizeof(struct server_base ));
 	//跨平台统一接口，将套接字设置为非阻塞状态
 	evutil_make_socket_nonblocking(listener);
 
@@ -105,11 +105,11 @@ struct server_t* tcp_server_init(int port, int listen_num)
 }
 
 
-void tcp_server_start(struct server_t* pserver, int thread_num)
+void tcp_server_start(struct server_base * pserver, int thread_num)
 {
 	event_base_dispatch(pserver->base);
 }
-void tcp_server_end(struct server_t**pserver)
+void tcp_server_end(struct server_base **pserver)
 {
 	event_free((*pserver)->ev_listen);
 	event_base_free((*pserver)->base);
