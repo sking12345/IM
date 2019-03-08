@@ -4,19 +4,20 @@
 #include "thread_pool.h"
 
 
-void *work(void *arg)
-{
+void *work(void *arg) {
 	int fd = *(int*)arg;
 
 	printf("%s:%d\n", "ddd", fd);
 	return NULL;
 }
 
-int main()
-{
+int main() {
+	struct thread_pool * server_pool = thread_pool_init(1, 10);
 	struct server_base* pserver = tcp_server_init(8888, 10);
+	set_server_thread_poll(pserver, server_pool);
 	tcp_server_start(pserver, 10);
 	tcp_server_end(&pserver);
+
 
 	// return 0;
 	// int fd = 1;

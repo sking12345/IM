@@ -3,18 +3,15 @@
 #if COMPILE_TYPE == 0x00
 
 
-struct server_accept * server_accept_new()
-{
+struct server_accept * server_accept_new() {
 	struct server_accept* paccept = (struct server_accept*)malloc(sizeof(struct server_accept));
 	return paccept;
 }
-void server_accept_free(struct server_accept** paccept)
-{
+void server_accept_free(struct server_accept** paccept) {
 	free(*paccept);
 	*paccept = NULL;
 }
-void accept_cb(int fd, short events, void* arg)
-{
+void accept_cb(int fd, short events, void* arg) {
 	evutil_socket_t sockfd;
 	struct sockaddr_in client;
 	socklen_t len = sizeof(client);
@@ -23,8 +20,7 @@ void accept_cb(int fd, short events, void* arg)
 	printf("accept a client %d\n", sockfd);
 	struct server_base *pserver = (struct server_base *)arg;
 	struct server_accept *paccept = server_accept_new();
-	if (paccept == NULL)
-	{
+	if (paccept == NULL) {
 		tcp_server_end(&pserver);
 		return;
 	}
@@ -37,35 +33,35 @@ void accept_cb(int fd, short events, void* arg)
 
 	event_add(paccept->ev, NULL);
 }
-#if SERVER_READ_TYPE == 0x00
 
-
-#endif
-
-void socket_read_cb(int fd, short events, void *arg)
-{
-
-	char msg[4096];
+void socket_read_cb(int fd, short events, void *arg) {
 	struct server_accept *paccept  = (struct server_accept*)arg;
+	// int cfd = event_get_fd(paccept->ev);
 
-	int cfd = event_get_fd(paccept->ev);
-	int len = read(fd, msg, sizeof(msg) - 1);
-	if ( len <= 0 )
-	{
+	// char msg[TCP_APK_SIZE + 1] = {0x00};
+	// int len = read(fd, msg, sizeof(msg));
+	// if ( len <= 0 ) {
+	// 	printf("close %d\n", fd);
+	// 	event_free(paccept->ev);
+	// 	close(fd);
+	// 	return ;
+	// }
+	// printf("cfd::%d\n", cfd );
+	// printf("%s\n", "xxdd");
+	// printf("recv the client msg: %s\n", msg);
+
+	struct apk_buf apk;
+	int len = read(fd, &apk, sizeof(struct apk_buf));
+	if ( len <= 0 ) {
 		printf("close %d\n", fd);
 		event_free(paccept->ev);
 		close(fd);
 		return ;
 	}
-	printf("cfd::%d\n", cfd );
-	printf("%s\n", "xxdd");
-	msg[len] = '\0';
-	printf("recv the client msg: %s\n", msg);
-
+	printf("recv the client msg: %s\n", apk.buf);
 }
 typedef struct sockaddr SA;
-struct server_base * tcp_server_init(int port, int listen_num)
-{
+struct server_base * tcp_server_init(int port, int listen_num) {
 	int errno_save;
 	evutil_socket_t listener;
 
@@ -79,21 +75,20 @@ struct server_base * tcp_server_init(int port, int listen_num)
 	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = 0;
 	sin.sin_port = htons(port);
-	if ( ::bind(listener, (SA*)&sin, sizeof(sin)) < 0 )
-	{
+	if ( ::bind(listener, (SA*)&sin, sizeof(sin)) < 0 ) {
 		errno_save = errno;
 		evutil_closesocket(listener);
 		errno = errno_save;
 		return NULL;
 	}
-	if ( ::listen(listener, listen_num) < 0)
-	{
+	if ( ::listen(listener, listen_num) < 0) {
 		errno_save = errno;
 		evutil_closesocket(listener);
 		errno = errno_save;
 		return NULL;
 	}
 	struct server_base *pserver = (struct server_base *)malloc(sizeof(struct server_base ));
+	pserver->pthread_pool = NULL;
 	//跨平台统一接口，将套接字设置为非阻塞状态
 	evutil_make_socket_nonblocking(listener);
 	pserver->base = event_base_new();
@@ -102,13 +97,22 @@ struct server_base * tcp_server_init(int port, int listen_num)
 	return pserver;
 }
 
-
-void tcp_server_start(struct server_base * pserver, int thread_num)
-{
-	event_base_dispatch(pserver->base);
+void set_server_thread_poll(struct server_base* pserver, struct thread_pool* pool) {
+	pserver->pthread_pool = pool;
 }
-void tcp_server_end(struct server_base **pserver)
-{
+
+
+int tcp_server_start(struct server_base * pserver, int thread_num) {
+#if SERVER_READ_TYPE == 0x00 //线程池读取数据
+	if (pserver->pthread_pool == NULL) {
+		log_debug("server_base->pthread_pool don't NULL", __FILE__, __LINE__, __FUNCTION__);
+		return -1;
+	}
+#endif
+	event_base_dispatch(pserver->base);
+	return true;
+}
+void tcp_server_end(struct server_base **pserver) {
 	event_free((*pserver)->ev_listen);
 	event_base_free((*pserver)->base);
 	free(*pserver);
