@@ -44,6 +44,7 @@ void socket_read_cb(int fd, short events, void *arg) {
 		close(fd);
 		return ;
 	}
+
 	printf("cfd::%d\n", fd );
 	printf("%s\n", "xxdd");
 	printf("recv the client msg: %s\n", msg);
@@ -77,7 +78,7 @@ struct server_base * tcp_server_init(int port, int listen_num) {
 		return NULL;
 	}
 	struct server_base *pserver = (struct server_base *)malloc(sizeof(struct server_base ));
-	pserver->pthread_pool = NULL;
+	pserver->arg = NULL;
 	//跨平台统一接口，将套接字设置为非阻塞状态
 	evutil_make_socket_nonblocking(listener);
 	pserver->base = event_base_new();
@@ -86,18 +87,12 @@ struct server_base * tcp_server_init(int port, int listen_num) {
 	return pserver;
 }
 
-void set_server_thread_poll(struct server_base* pserver, struct thread_pool* pool) {
-	pserver->pthread_pool = pool;
+void set_server_arg(struct server_base*, void*arg) {
+	pserver->arg = arg;
 }
 
 
 int tcp_server_start(struct server_base * pserver, int thread_num) {
-#if SERVER_READ_TYPE == 0x00 //线程池读取数据
-	if (pserver->pthread_pool == NULL) {
-		log_debug("server_base->pthread_pool don't NULL", __FILE__, __LINE__, __FUNCTION__);
-		return -1;
-	}
-#endif
 	event_base_dispatch(pserver->base);
 	return true;
 }

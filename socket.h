@@ -15,7 +15,10 @@
 typedef struct server_base {
 	struct event_base* base;
 	struct event* ev_listen;
-	struct thread_pool *pthread_pool;
+	void* (*new_accept_call)(int cfd);
+	void* (*abnormal_call)(int cfd);
+	void* (*message_call)(int cfd, char*);
+	void *arg;
 } server_base_t;
 
 typedef struct server_accept {
@@ -32,7 +35,8 @@ void socket_read_cb(int fd, short events, void *arg);
 
 struct server_base* tcp_server_init(int port, int listen_num);
 
-void set_server_thread_poll(struct server_base*, struct thread_pool*);	//设置处理线程池
+void set_server_arg(struct server_base*, void*arg);	//设置处理线程池
+
 
 int tcp_server_start(struct server_base*, int thread_num);
 void tcp_server_end(struct server_base**);
