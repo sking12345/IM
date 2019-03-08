@@ -16,16 +16,12 @@ void server_accept_free(struct server_accept** paccept)
 void accept_cb(int fd, short events, void* arg)
 {
 	evutil_socket_t sockfd;
-
 	struct sockaddr_in client;
 	socklen_t len = sizeof(client);
-
 	sockfd = ::accept(fd, (struct sockaddr*)&client, &len );
 	evutil_make_socket_nonblocking(sockfd);
-
 	printf("accept a client %d\n", sockfd);
 	struct server_base *pserver = (struct server_base *)arg;
-	// struct event_base* base = (event_base*)arg;
 	struct server_accept *paccept = server_accept_new();
 	if (paccept == NULL)
 	{
@@ -41,10 +37,18 @@ void accept_cb(int fd, short events, void* arg)
 
 	event_add(paccept->ev, NULL);
 }
+#if SERVER_READ_TYPE == 0x00
+
+
+#endif
+
 void socket_read_cb(int fd, short events, void *arg)
 {
+
 	char msg[4096];
 	struct server_accept *paccept  = (struct server_accept*)arg;
+
+	int cfd = event_get_fd(paccept->ev);
 	int len = read(fd, msg, sizeof(msg) - 1);
 	if ( len <= 0 )
 	{
@@ -53,6 +57,7 @@ void socket_read_cb(int fd, short events, void *arg)
 		close(fd);
 		return ;
 	}
+	printf("cfd::%d\n", cfd );
 	printf("%s\n", "xxdd");
 	msg[len] = '\0';
 	printf("recv the client msg: %s\n", msg);
@@ -70,12 +75,10 @@ struct server_base * tcp_server_init(int port, int listen_num)
 
 	//允许多次绑定同一个地址。要用在socket和bind之间
 	evutil_make_listen_socket_reuseable(listener);
-
 	struct sockaddr_in sin;
 	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = 0;
 	sin.sin_port = htons(port);
-
 	if ( ::bind(listener, (SA*)&sin, sizeof(sin)) < 0 )
 	{
 		errno_save = errno;
@@ -83,23 +86,18 @@ struct server_base * tcp_server_init(int port, int listen_num)
 		errno = errno_save;
 		return NULL;
 	}
-
 	if ( ::listen(listener, listen_num) < 0)
 	{
 		errno_save = errno;
 		evutil_closesocket(listener);
 		errno = errno_save;
 		return NULL;
-
 	}
 	struct server_base *pserver = (struct server_base *)malloc(sizeof(struct server_base ));
 	//跨平台统一接口，将套接字设置为非阻塞状态
 	evutil_make_socket_nonblocking(listener);
-
 	pserver->base = event_base_new();
-	// pserver->ev_listen = event_new(pserver->base, listener, EV_READ | EV_PERSIST, accept_cb, pserver->base);
 	pserver->ev_listen = event_new(pserver->base, listener, EV_READ | EV_PERSIST, accept_cb, pserver);
-
 	event_add(pserver->ev_listen, NULL);
 	return pserver;
 }

@@ -8,11 +8,13 @@
 #include <stdlib.h>
 #if COMPILE_TYPE == 0x00
 #include<event.h>
+#include "thread_pool.h"
 
 typedef struct server_base
 {
 	struct event_base* base;
 	struct event* ev_listen;
+
 } server_base_t;
 
 typedef struct server_accept
