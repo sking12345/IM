@@ -40,8 +40,6 @@ int main(int argc, char** argv) {
         printf("connect error: %s(errno: %d)\n", strerror(errno), errno);
         exit(0);
     }
-
-
     printf("send msg to server: \n");
     fgets(sendline, 4096, stdin);
     if ( send(sockfd, sendline, strlen(sendline), 0) < 0) {

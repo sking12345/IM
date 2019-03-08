@@ -1,129 +1,74 @@
-#include<stdio.h>
-#include<string.h>
-#include<errno.h>
+/**
+ * C语言实现的红黑树(Red Black Tree)
+ *
+ * @author skywang
+ * @date 2013/11/18
+ */
 
-#include<unistd.h>
-#include<event.h>
+#include <stdio.h>
+#include "rbtree.h"
 
+#define CHECK_INSERT 0    // "插入"动作的检测开关(0，关闭；1，打开)
+#define CHECK_DELETE 0    // "删除"动作的检测开关(0，关闭；1，打开)
+#define LENGTH(a) ( (sizeof(a)) / (sizeof(a[0])) )
 
+int main() {
+    int a[] = {10, 40, 30, 60, 90, 70, 20, 50, 80};
+    int i, ilen = LENGTH(a);
+    RBRoot *root = NULL;
 
-void accept_cb(int fd, short events, void* arg);
-void socket_read_cb(int fd, short events, void *arg);
+    root = create_rbtree();
+    printf("== 原始数据: ");
+    for (i = 0; i < ilen; i++)
+        printf("%d ", a[i]);
+    printf("\n");
 
-int tcp_server_init(int port, int listen_num);
-
-int main(int argc, char** argv)
-{
-
-    int listener = tcp_server_init(9999, 10);
-    if ( listener == -1 )
-    {
-        perror(" tcp_server_init error ");
-        return -1;
+    for (i = 0; i < ilen; i++) {
+        insert_rbtree(root, a[i]);
+#if CHECK_INSERT
+        printf("== 添加节点: %d\n", a[i]);
+        printf("== 树的详细信息: \n");
+        print_rbtree(root);
+        printf("\n");
+#endif
     }
 
-    struct event_base* base = event_base_new();
+    printf("== 前序遍历: ");
+    preorder_rbtree(root);
 
-    //添加监听客户端请求连接事件
-    struct event* ev_listen = event_new(base, listener, EV_READ | EV_PERSIST,
-                                        accept_cb, base);
-    event_add(ev_listen, NULL);
+    printf("\n== 中序遍历: ");
+    inorder_rbtree(root);
 
+    printf("\n== 后序遍历: ");
+    postorder_rbtree(root);
+    printf("\n");
 
-    event_base_dispatch(base);
+    if (rbtree_minimum(root, &i) == 0)
+        printf("== 最小值: %d\n", i);
+    if (rbtree_maximum(root, &i) == 0)
+        printf("== 最大值: %d\n", i);
+    printf("== 树的详细信息: \n");
+    print_rbtree(root);
+    printf("\n");
 
+#if CHECK_DELETE
+    for (i = 0; i < ilen; i++) {
+        delete_rbtree(root, a[i]);
+
+        printf("== 删除节点: %d\n", a[i]);
+        if (root) {
+            printf("== 树的详细信息: \n");
+            print_rbtree(root);
+            printf("\n");
+        }
+    }
+#endif
+
+    destroy_rbtree(root);
     return 0;
 }
 
 
 
-void accept_cb(int fd, short events, void* arg)
-{
-    evutil_socket_t sockfd;
-
-    struct sockaddr_in client;
-    socklen_t len = sizeof(client);
-
-    sockfd = ::accept(fd, (struct sockaddr*)&client, &len );
-    evutil_make_socket_nonblocking(sockfd);
-
-    printf("accept a client %d\n", sockfd);
-
-    struct event_base* base = (event_base*)arg;
-
-    //仅仅是为了动态创建一个event结构体
-    struct event *ev = event_new(NULL, -1, 0, NULL, NULL);
-    //将动态创建的结构体作为event的回调参数
-    event_assign(ev, base, sockfd, EV_READ | EV_PERSIST,
-                 socket_read_cb, (void*)ev);
-
-    event_add(ev, NULL);
-}
 
 
-void socket_read_cb(int fd, short events, void *arg)
-{
-    char msg[4096];
-    struct event *ev = (struct event*)arg;
-    int len = read(fd, msg, sizeof(msg) - 1);
-
-
-
-    if ( len <= 0 )
-    {
-        printf("some error happen when read\n");
-        event_free(ev);
-        close(fd);
-        return ;
-    }
-
-    printf("%s\n", "xxdd");
-
-    msg[len] = '\0';
-    //  printf("recv the client msg: %s", msg);
-
-    // char reply_msg[4096] = "I have recvieced the msg: ";
-    // strcat(reply_msg + strlen(reply_msg), msg);
-
-    // write(fd, reply_msg, strlen(reply_msg) );
-}
-
-
-
-typedef struct sockaddr SA;
-int tcp_server_init(int port, int listen_num)
-{
-    int errno_save;
-    evutil_socket_t listener;
-
-    listener = ::socket(AF_INET, SOCK_STREAM, 0);
-    if ( listener == -1 )
-        return -1;
-
-    //允许多次绑定同一个地址。要用在socket和bind之间
-    evutil_make_listen_socket_reuseable(listener);
-
-    struct sockaddr_in sin;
-    sin.sin_family = AF_INET;
-    sin.sin_addr.s_addr = 0;
-    sin.sin_port = htons(port);
-
-    if ( ::bind(listener, (SA*)&sin, sizeof(sin)) < 0 )
-        goto error;
-
-    if ( ::listen(listener, listen_num) < 0)
-        goto error;
-
-
-    //跨平台统一接口，将套接字设置为非阻塞状态
-    evutil_make_socket_nonblocking(listener);
-
-    return listener;
-
-error:
-    errno_save = errno;
-    evutil_closesocket(listener);
-    errno = errno_save;
-
-    return -1;
-}
