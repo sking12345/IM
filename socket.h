@@ -11,11 +11,6 @@
 #include<event.h>
 #include "thread_pool.h"
 
-typedef struct apk_buf {
-	int size;
-	int number;
-	char buf[TCP_APK_SIZE + 1];
-} apk_buf_t;
 
 typedef struct server_base {
 	struct event_base* base;

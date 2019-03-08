@@ -48,15 +48,6 @@ void socket_read_cb(int fd, short events, void *arg) {
 	printf("%s\n", "xxdd");
 	printf("recv the client msg: %s\n", msg);
 
-	// struct apk_buf apk;
-	// int len = read(fd, &apk, sizeof(struct apk_buf));
-	// if ( len <= 0 ) {
-	// 	printf("close %d\n", fd);
-	// 	event_free(paccept->ev);
-	// 	close(fd);
-	// 	return ;
-	// }
-	// printf("recv the client msg: %s\n", apk.buf);
 }
 typedef struct sockaddr SA;
 struct server_base * tcp_server_init(int port, int listen_num) {
