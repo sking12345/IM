@@ -1,7 +1,109 @@
 #include "socket.h"
 
-#if COMPILE_TYPE == 0x00
 
+/**
+ * [send_apk 分包发送数据]
+ * @param fd   [description]
+ * @param buf  [description]
+ * @param size [成功返回0，失败返回失败编码]
+ */
+/**
+ * [send_apk 分包发送数据]
+ * @param  fd          [socket fd]
+ * @param  buf         [数据]
+ * @param  size        [数据大小]
+ * @param number       [从第几个分包发送,默认0]
+ * @param  send_number [第几个数据包发送失败]
+ * @return             [成功返回0，失败返回失败编码]
+ */
+int send_apk(int fd, char *buf, int data_size, int number, int *send_number) {
+	printf("buf::%s\n", buf );
+	struct apk_buf apk;
+	int send_size = sizeof(struct apk_buf);
+	apk.size = data_size;
+	int residue = data_size % TCP_APK_SIZE;
+	if (residue > 0) {
+		int count = (data_size - residue) / TCP_APK_SIZE;
+		for (int i = number; i < count; ++i) {
+			apk.number = i;
+			apk.status = APK_NOT_END;
+			memset(apk.buf, 0x00, TCP_APK_SIZE);
+			memcpy(apk.buf, buf + number * TCP_APK_SIZE, TCP_APK_SIZE);
+			int status = send(fd, &apk, send_size, 0);
+			if (status < 0) {
+				log_print("send apk");
+				*send_number = i;
+				return -1;
+			}
+		}
+		apk.status = APK_END;
+		apk.number = count;
+		memset(apk.buf, 0x00, TCP_APK_SIZE);
+		memcpy(apk.buf, buf + count * TCP_APK_SIZE, residue);
+		int status = send(fd, &apk, send_size, 0);
+		if (status < 0) {
+			*send_number = count;
+			log_print("send apk");
+			return -1;
+		}
+	} else {
+		int count = data_size / TCP_APK_SIZE;
+		for (int i = number; i < count; ++i) {
+			apk.number = i;
+			if (i + 1 < count) {
+				apk.status = APK_NOT_END;
+			} else {
+				apk.status = APK_END;
+			}
+			memset(apk.buf, 0x00, TCP_APK_SIZE);
+			memcpy(apk.buf, buf + number * TCP_APK_SIZE, TCP_APK_SIZE);
+			int status = send(fd, &apk, send_size, 0);
+			if (status < 0) {
+				log_print("send apk");
+				*send_number = i;
+				return -1;
+			}
+		}
+	}
+#if TCP_QUEUE_DEBUG == 0x01
+	printf("%s\n", "send_apk success");
+#endif
+	return 0;
+}
+
+/**
+ * [save_sended_queue 存放发送后的数据队列]
+ */
+void save_sended_queue(sended_queue_t*sended_queue, send_queue_t*node) {
+	if (sended_queue == NULL || node == NULL) {
+		return;
+	}
+	node->next = NULL;
+	//锁住该队列,存入已发送的数据,用于服务器确认接受成功
+	pthread_mutex_lock(&(sended_queue->mutex));
+	if (sended_queue->sq_head == NULL) {
+		sended_queue->sq_head = sended_queue->sq_tail = node;
+	} else {
+		sended_queue->sq_head->next = node;
+	}
+	sended_queue->queue_num++;
+	pthread_mutex_unlock(&(sended_queue->mutex));
+#if TCP_QUEUE_DEBUG == 0x01
+	send_queue_t * test_head = sended_queue->sq_head;
+	send_queue_t *test_node = NULL;
+	while (test_head != NULL) {
+		test_node = test_head;
+		test_head = test_head->next;
+		printf("test save_sended_queue:%s\n", test_node->buf);
+		// free(test_node);
+		// test_node = NULL;
+	}
+	// sended_queue->sq_head = NULL;
+#endif
+
+}
+
+#if COMPILE_TYPE == 0x00
 
 struct server_accept * server_accept_new() {
 	struct server_accept* paccept = (struct server_accept*)malloc(sizeof(struct server_accept));
@@ -36,43 +138,63 @@ void accept_cb(int fd, short events, void* arg) {
 
 void socket_read_cb(int fd, short events, void *arg) {
 	struct server_accept *paccept  = (struct server_accept*)arg;
-	char msg[TCP_APK_SIZE + 1] = {0x00};
-	int len = read(fd, msg, sizeof(msg));
+	// char msg[TCP_APK_SIZE + 1] = {0x00};
+	// int len = read(fd, msg, sizeof(msg));
+	// if ( len <= 0 ) {
+	// 	printf("close %d\n", fd);
+	// 	event_free(paccept->ev);
+	// 	close(fd);
+	// 	return ;
+	// }
+	struct apk_buf recv_apk;
+	int recv_size = sizeof(struct apk_buf);
+	int len = read(fd, &recv_apk, recv_size);
+
 	if ( len <= 0 ) {
 		printf("close %d\n", fd);
 		event_free(paccept->ev);
 		close(fd);
 		return ;
 	}
+	printf("test buf:%s\n", recv_apk.buf);
+
 	struct server_read sread;
 	sread.fd = fd;
 	sread.data_size = len;
 	sread.ev =  paccept->ev;
-	sread.data_buf = msg;
+	sread.data_buf = recv_apk.buf;
 	sread.arg = paccept->pserver->arg;
+#if TCP_QUEEU_TYPE == 0x01	//采用了队列
+	if (recv_apk.status == APK_NOT_END) {
+
+	} else if (recv_apk.status == APK_END) {
+
+	} else if (recv_apk.status == APK_CONFIRM) {
+
+	} else {
+		log_print("read error");
+	}
+#endif
 #if SERVER_READ_TYPE == 0x00
-	thread_add_job(paccept->pserver->thread_pool, paccept->pserver->new_data, (void*)&sread);
+	thread_add_job(paccept->pserver->thread_pool, paccept->pserver->read_call, (void*)&sread);
 #endif
 #if SERVER_READ_TYPE == 0x01
-	paccept->pserver->new_data(sread);
+	paccept->pserver->read_call(sread);
 #endif
 
 }
 //接受数据的连接fd
-int get_server_read_fd(void *sread)
-{
+int get_server_read_fd(void *sread) {
 	struct server_read * read_t = (struct server_read*)sread;
 	return read_t->fd;
 }
 //接受到的数据大小
-int get_server_read_size(void *sread)
-{
+int get_server_read_size(void *sread) {
 	struct server_read * read_t = (struct server_read*)sread;
 	return read_t->data_size;
 }
 //接受到的数据
-char* get_server_read_buf(void *sread)
-{
+char* get_server_read_buf(void *sread) {
 	struct server_read * read_t = (struct server_read*)sread;
 	return read_t->data_buf;
 }
@@ -125,9 +247,8 @@ void set_server(struct server_base* pserver, struct thread_pool* pool, void*arg)
 }
 
 void set_server_call(struct server_base* pserver, void* (*new_accept)(int cfd),
-                     void* (*new_data)(void *sread),
-                     void* (*abnormal)(int cfd))
-{
+                     void* (*read_call)(void *sread),
+                     void* (*abnormal)(int cfd)) {
 	pserver->new_accept = new_accept;
 	pserver->read_call = read_call;
 	pserver->abnormal = abnormal;
@@ -135,14 +256,12 @@ void set_server_call(struct server_base* pserver, void* (*new_accept)(int cfd),
 
 int tcp_server_start(struct server_base * pserver, int thread_num) {
 #if SERVER_READ_TYPE == 0x00
-	if (pserver->thread_pool == NULL)
-	{
+	if (pserver->thread_pool == NULL) {
 		log_debug("tcp server start fail,plase set server thread poll", __FILE__, __LINE__, __FUNCTION__);
 		return -1;
 	}
 #endif
-	if (pserver->new_data == NULL)
-	{
+	if (pserver->read_call == NULL) {
 		log_debug("tcp server start fail,plase set server new data call function", __FILE__, __LINE__, __FUNCTION__);
 		return -1;
 	}
@@ -157,15 +276,13 @@ void tcp_server_end(struct server_base **pserver) {
 	*pserver = NULL;
 }
 #else
-struct client_base * tcp_client_init(const char *ipstr, int port)
-{
+struct client_base * tcp_client_init(const char *ipstr, int port) {
 	int sockfd;
 
 	struct sockaddr_in serveraddr;
 	//1.创建一个socket
 	int confd = socket(AF_INET, SOCK_STREAM, 0);
-	if (confd < 0)
-	{
+	if (confd < 0) {
 		log_print("socket fail");
 		return NULL;
 	}
@@ -176,8 +293,7 @@ struct client_base * tcp_client_init(const char *ipstr, int port)
 	inet_pton(AF_INET, ipstr, &serveraddr.sin_addr.s_addr);
 	serveraddr.sin_port  = htons(port);
 	//3.链接服务器
-	if (connect(confd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) < 0)
-	{
+	if (connect(confd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) < 0) {
 		log_print("connect fail");
 		return NULL;
 	}
@@ -185,20 +301,18 @@ struct client_base * tcp_client_init(const char *ipstr, int port)
 	base->ip = (char*)ipstr;
 	base->port = port;
 	base->fd = confd;
+
 	return base;
 }
-void set_client_thread_pool(struct client_base* cbase, struct thread_pool *pool, void*(*read_call)(void *cread))
-{
+void set_client_thread_pool(struct client_base* cbase, struct thread_pool *pool, void*(*read_call)(void *cread)) {
 	cbase->thread_pool = pool;
 	cbase->read_call = read_call;
 }
 
-void *client_read_thread(void *arg)
-{
+void *client_read_thread(void *arg) {
 	struct client_base* cbase = (struct client_base*)arg;
 	int fd = cbase->fd;
-	while (1)
-	{
+	while (1) {
 		char msg[TCP_APK_SIZE + 1] = {0x00};
 		int len = read(fd, msg, sizeof(msg));
 		if ( len <= 0 ) {
@@ -221,14 +335,92 @@ void *client_read_thread(void *arg)
 	return NULL;
 }
 
-int tcp_client_start(struct client_base* cbase)
-{
+#if TCP_QUEEU_TYPE == 0x01	//发送消息采用队列机制
+void *client_send_thread(void *arg) {
+	struct client_base* cbase = (struct client_base*)arg;
+	struct send_thread *sthread  = cbase->sthread;
+	while (1) {
+		pthread_mutex_lock(&(sthread->mutex));
+		while (sthread->queue_num == 0) { //队列为空时，就等待队列非空
+			pthread_cond_wait(&(sthread->cond), &(sthread->mutex));
+		}
+		if (sthread->close) {	//关闭线程
+			if (sthread->sq_head != NULL) {
+				struct send_queue * node;
+				struct send_queue * head = sthread->sq_head;
+				while (head != NULL) {
+					node = head;
+					head = head->next;
+					free(node);
+					node = NULL;
+				}
+			}
+			pthread_mutex_unlock(&(sthread->mutex));
+			pthread_cond_signal(&(sthread->close_cond));
+			pthread_exit(NULL);
+		}
+		sthread->queue_num--;
+		struct send_queue * snode = sthread->sq_head;
+		sthread->sq_head = sthread->sq_head->next;
+		pthread_mutex_unlock(&(sthread->mutex));
+		int send_number = 0;
+		int send_info  = send_apk(snode->fd, snode->buf, snode->size, snode->send_number, &send_number);
+		if ( send_info < 0) { //发送失败,将发送失败的数据发到队列前,暂时考虑连接正常的发送失败
+			pthread_mutex_lock(&(sthread->mutex));
+			snode->send_number = send_number;
+			snode->next = sthread->sq_head;
+			sthread->sq_head = snode;
+			sthread->queue_num++;
+			pthread_mutex_unlock(&(sthread->mutex));
+		} else {
+			save_sended_queue(cbase->sended_queue, snode);	//存入已发送队列
+
+		}
+		printf("%d\n", send_number );
+	}
+}
+
+#endif
+
+int tcp_client_start(struct client_base* cbase) {
 #if READ_CALL_TYEP == 0x00	//调用线程池去调用设置的回调函数
-	if (cbase->thread_pool == NULL)
-	{
+	if (cbase->thread_pool == NULL) {
 		log_print("plase set thread poll");
 		return -1;
 	}
+#endif
+#if TCP_QUEEU_TYPE == 0x01	//发送消息采用队列机制
+	cbase->sthread = (struct send_thread*)malloc(sizeof(struct send_thread));
+	cbase->sended_queue = (sended_queue_t*)malloc(sizeof(sended_queue_t));
+	cbase->sthread->sq_head = NULL;
+	cbase->sthread->sq_tail = NULL;
+	cbase->sthread->queue_num = 0;
+//用于存放发送的数据
+	cbase->sended_queue->sq_head = NULL;
+	cbase->sended_queue->sq_tail = NULL;
+	cbase->sended_queue->queue_num = 0;
+
+	if (pthread_mutex_init(&(cbase->sthread->mutex), NULL) < 0) {
+		log_print("pthread_mutex_init fail");
+		free(cbase->sthread);
+		cbase->sthread = NULL;
+		return -1;
+	}
+	if (pthread_cond_init(&(cbase->sthread->cond), NULL) < 0) {
+		log_print("pthread_cond_init fail");
+		free(cbase->sthread);
+		cbase->sthread = NULL;
+		return -1;
+	}
+
+	if (pthread_cond_init(&(cbase->sthread->close_cond), NULL) < 0) {
+		log_print("pthread_cond_init fail");
+		free(cbase->sthread);
+		cbase->sthread = NULL;
+		return -1;
+	}
+	pthread_t send_thread;
+	pthread_create(&send_thread, NULL, client_send_thread, (void*)cbase);
 #endif
 	pthread_t read_thread;
 	pthread_create(&read_thread, NULL, client_read_thread, (void*)cbase);
@@ -236,34 +428,54 @@ int tcp_client_start(struct client_base* cbase)
 }
 
 #if TCP_QUEEU_TYPE == 0x01
-int tcp_client_send(struct client_base*cbase, char *buf, int size, int priority)	//发送数据函数
-{
+int tcp_client_send(struct client_base* cbase, char *buf, int size, int priority) {	//发送数据函数
 	int _size = sizeof(struct send_queue) + size;
 	struct send_queue * squeue = (struct send_queue*)malloc(_size);
 	memset(squeue, 0x00, _size);
 	squeue->size = size;
 	squeue->next = NULL;
+	squeue->fd = get_client_fd(cbase);
+	squeue->send_number = 0;
+
 	memcpy(squeue->buf, buf, size);
-	if (priority == 0x01)	//优先发送
-	{
+	pthread_mutex_lock(&(cbase->sthread->mutex));
+	if (priority == 0x01) {	//优先发送
 
+		if (cbase->sthread->sq_head == NULL) {
+			cbase->sthread->sq_head = cbase->sthread->sq_tail = squeue;
+		} else {
+			squeue->next = cbase->sthread->sq_head;
+			cbase->sthread->sq_head = squeue;
+		}
 	} else {
-
+		if (cbase->sthread->sq_head == NULL) {
+			cbase->sthread->sq_head = cbase->sthread->sq_tail = squeue;
+		} else {
+			cbase->sthread->sq_tail->next = squeue;
+			cbase->sthread->sq_tail = squeue;
+		}
 	}
-	printf("%s\n", squeue->buf);
-	// send_data(cbase->fd, buf, size);
-	// if (send(fd, buf, buf_size, 0) < 0)
-	// {
-	// 	log_print("error:send fail");
-	// 	return -1;
-	// }
+	cbase->sthread->queue_num++;
+	pthread_mutex_unlock(&(cbase->sthread->mutex));
+	pthread_cond_signal(&(cbase->sthread->cond));
+
+#if TCP_QUEUE_DEBUG == 0x01	//测试发送队列
+	log_print("test send queue ...");
+	struct send_queue *node = NULL;
+	struct send_queue * head = cbase->sthread->sq_head;
+	while (head != NULL) {
+		node = head;
+		head = head->next;
+		printf("%s\n", node->buf);
+	}
+#endif
+
+
 	return 1;
 }
 #else
-int tcp_client_send(struct client_base*cbase, char *buf, int size)
-{
-	if (send(cbase->fd, buf, size, 0) < 0)
-	{
+int tcp_client_send(struct client_base*cbase, char *buf, int size) {
+	if (send(cbase->fd, buf, size, 0) < 0) {
 		log_print("error:send fail");
 		return -1;
 	}
@@ -271,30 +483,24 @@ int tcp_client_send(struct client_base*cbase, char *buf, int size)
 }
 #endif
 
-int get_client_fd(void *cread)
-{
+int get_client_fd(void *cread) {
 	struct client_read *read_info = (struct client_read*)cread;
 	return read_info->fd;
 }
-char * get_client_read_buf(void *cread)
-{
+char * get_client_read_buf(void *cread) {
 	struct client_read *read_info = (struct client_read*)cread;
 	return read_info->data_buf;
 }
-int get_client_read_size(void *cread)
-{
+int get_client_read_size(void *cread) {
 	struct client_read *read_info = (struct client_read*)cread;
 	return read_info->data_size;
 }
 
-void tcp_client_end(struct client_base **cbase)
-{
-	if (*cbase == NULL)
-	{
+void tcp_client_end(struct client_base **cbase) {
+	if (*cbase == NULL) {
 		return;
 	}
-	if ((*cbase)->fd > 0)
-	{
+	if ((*cbase)->fd > 0) {
 		close((*cbase)->fd);
 	}
 	free(*cbase);
@@ -302,6 +508,7 @@ void tcp_client_end(struct client_base **cbase)
 }
 
 #endif
+
 
 
 

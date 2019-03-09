@@ -22,24 +22,43 @@
 #include<event.h>
 #endif
 
+#define APK_NOT_END 0x00
+#define APK_END 0x01
+#define APK_CONFIRM 0x02
+
 //数据包分别结构
-typedef struct apk_buf
-{
+typedef struct apk_buf {
 	int status;
 	int number;
-	int ver;
-	char buf[TCP_APK_SIZE + 1];
+	char only_number[16];	//数据唯一编号,struct send_queue 的编号一样,用于服务器确认接受到的什么数据
+	int verify;
+	int size;
+	char buf[TCP_APK_SIZE];
 } apk_buf_t;
+
+
 
 #if TCP_QUEEU_TYPE == 0x01
 
 //数据发送队列
-typedef struct send_queue
-{
+typedef struct send_queue {
+	int fd;
 	int size;
+	int send_number;	//已发送后的编号
+	char only_number[16];	//数据唯一编号
 	struct  send_queue *next;
 	char buf[0];
 } send_queue_t;
+typedef struct send_thread {
+	pthread_mutex_t mutex; //互斥信号量
+	pthread_cond_t cond;	//条件变量
+	pthread_cond_t close_cond;
+	int close;
+	int queue_num; //发送queue大小
+	struct send_queue *sq_head;
+	struct send_queue *sq_tail;
+} send_thread_t;
+typedef struct send_thread sended_queue_t;
 #endif
 
 
@@ -47,17 +66,11 @@ typedef struct send_queue
 /**
  * 读取到数据
  */
-typedef struct server_read
-{
+typedef struct server_read {
 	int fd;
 	int data_size;
 	struct event *ev;
 	void *data_buf;
-#if TCP_QUEEU_TYPE == 0x01
-	struct send_queue *head;
-	struct send_queue *tail;
-	int send_queue_num; //发送queue大小
-#endif
 	void *arg;
 } server_read_cd_t;
 
@@ -68,6 +81,10 @@ typedef struct server_base {
 	void* (*abnormal)(int cfd);
 	void* (*read_call)(void *sread);
 	struct thread_pool *thread_pool;
+#if TCP_QUEEU_TYPE == 0x01
+	struct send_thread *sthread;
+	sended_queue_t * sended_queue;
+#endif
 	void *arg;
 } server_base_t;
 
@@ -103,25 +120,25 @@ void tcp_server_end(struct server_base**);
 
 #else
 
-typedef struct client_read
-{
+typedef struct client_read {
 	int fd;
 	int data_size;
 	void *data_buf;
-	void *arg;
-} client_read;
 
-typedef struct client_base
-{
+	void *arg;
+} client_read_t;
+
+
+
+typedef struct client_base {
 	int fd;
 	char *ip;
 	int port;
 	struct thread_pool *thread_pool;
 	void* (*read_call)(void *cread);
 #if TCP_QUEEU_TYPE == 0x01
-	int send_queue_num; //发送queue大小
-	struct send_queue *head;
-	struct send_queue *tail;
+	struct send_thread *sthread;
+	sended_queue_t * sended_queue;
 #endif
 	void *arg;
 } client_base_t;
@@ -148,14 +165,8 @@ void tcp_client_end(struct client_base **);
 
 #endif
 
-/**
- * [send_data 发送数据]
- * @param  fd       [description]
- * @param  buf      [description]
- * @param  buf_size [description]
- * @return          [description]
- */
-int send_data(int fd, char *buf, int buf_size);
+
+
 
 
 
