@@ -11,10 +11,21 @@ void *work(void *arg) {
 	return NULL;
 }
 
+
+void * server_read_fun(void *sread)
+{
+	int fd = get_server_read_fd(sread);
+	char *str = get_server_read_data(sread);
+	printf("new msg:%d--%s\n", fd, str);
+	return NULL;
+}
+
+
 int main() {
 	struct thread_pool * server_pool = thread_pool_init(1, 10);
 	struct server_base* pserver = tcp_server_init(8888, 10);
-	set_server_thread_poll(pserver, server_pool);
+	set_server_call(pserver, NULL, server_read_fun, NULL);
+	set_server(pserver, server_pool, NULL);
 	tcp_server_start(pserver, 10);
 	tcp_server_end(&pserver);
 
