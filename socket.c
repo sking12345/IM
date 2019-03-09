@@ -34,7 +34,6 @@ void accept_cb(int fd, short events, void* arg) {
 	event_add(paccept->ev, NULL);
 }
 
-
 void socket_read_cb(int fd, short events, void *arg) {
 	struct server_accept *paccept  = (struct server_accept*)arg;
 	char msg[TCP_APK_SIZE + 1] = {0x00};
@@ -47,26 +46,36 @@ void socket_read_cb(int fd, short events, void *arg) {
 	}
 	struct server_read sread;
 	sread.fd = fd;
+	sread.data_size = len;
 	sread.ev =  paccept->ev;
 	sread.data_buf = msg;
-	sread.arg = NULL;
+	sread.arg = paccept->pserver->arg;
 #if SERVER_READ_TYPE == 0x00
 	thread_add_job(paccept->pserver->thread_pool, paccept->pserver->new_data, (void*)&sread);
 #endif
+#if SERVER_READ_TYPE == 0x01
+	paccept->pserver->new_data(sread);
+#endif
 
 }
-
+//接受数据的连接fd
 int get_server_read_fd(void *sread)
 {
 	struct server_read * read_t = (struct server_read*)sread;
 	return read_t->fd;
 }
-char* get_server_read_data(void *sread)
+//接受到的数据大小
+int get_server_read_size(void *sread)
+{
+	struct server_read * read_t = (struct server_read*)sread;
+	return read_t->data_size;
+}
+//接受到的数据
+char* get_server_read_buf(void *sread)
 {
 	struct server_read * read_t = (struct server_read*)sread;
 	return read_t->data_buf;
 }
-
 
 
 typedef struct sockaddr SA;
@@ -120,7 +129,7 @@ void set_server_call(struct server_base* pserver, void* (*new_accept)(int cfd),
                      void* (*abnormal)(int cfd))
 {
 	pserver->new_accept = new_accept;
-	pserver->new_data = new_data;
+	pserver->read_call = read_call;
 	pserver->abnormal = abnormal;
 }
 
@@ -148,6 +157,149 @@ void tcp_server_end(struct server_base **pserver) {
 	*pserver = NULL;
 }
 #else
+struct client_base * tcp_client_init(const char *ipstr, int port)
+{
+	int sockfd;
+
+	struct sockaddr_in serveraddr;
+	//1.创建一个socket
+	int confd = socket(AF_INET, SOCK_STREAM, 0);
+	if (confd < 0)
+	{
+		log_print("socket fail");
+		return NULL;
+	}
+	//2.初始化服务器地址
+	bzero(&serveraddr, sizeof(serveraddr));
+	serveraddr.sin_family = AF_INET;
+	//"192.168.6.254"
+	inet_pton(AF_INET, ipstr, &serveraddr.sin_addr.s_addr);
+	serveraddr.sin_port  = htons(port);
+	//3.链接服务器
+	if (connect(confd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) < 0)
+	{
+		log_print("connect fail");
+		return NULL;
+	}
+	struct client_base * base = (struct client_base *)malloc(sizeof(struct client_base));
+	base->ip = (char*)ipstr;
+	base->port = port;
+	base->fd = confd;
+	return base;
+}
+void set_client_thread_pool(struct client_base* cbase, struct thread_pool *pool, void*(*read_call)(void *cread))
+{
+	cbase->thread_pool = pool;
+	cbase->read_call = read_call;
+}
+
+void *client_read_thread(void *arg)
+{
+	struct client_base* cbase = (struct client_base*)arg;
+	int fd = cbase->fd;
+	while (1)
+	{
+		char msg[TCP_APK_SIZE + 1] = {0x00};
+		int len = read(fd, msg, sizeof(msg));
+		if ( len <= 0 ) {
+			printf("close %d\n", fd);
+			close(fd);
+			return NULL;
+		}
+		printf("%s\n", msg);
+		struct client_read cread;
+		cread.fd = fd;
+		cread.data_size = len;
+		cread.data_buf = msg;
+#if READ_CALL_TYEP == 0x00	//调用线程池去调用设置的回调函数
+		thread_add_job(cbase->thread_pool, cbase->read_call, (void*)&cread);
+#endif
+#if READ_CALL_TYEP == 0x01	//直接调用设置的回调的函数
+		cbase->read_call(&cread);
+#endif
+	}
+	return NULL;
+}
+
+int tcp_client_start(struct client_base* cbase)
+{
+#if READ_CALL_TYEP == 0x00	//调用线程池去调用设置的回调函数
+	if (cbase->thread_pool == NULL)
+	{
+		log_print("plase set thread poll");
+		return -1;
+	}
+#endif
+	pthread_t read_thread;
+	pthread_create(&read_thread, NULL, client_read_thread, (void*)cbase);
+	return 1;
+}
+
+#if TCP_QUEEU_TYPE == 0x01
+int tcp_client_send(struct client_base*cbase, char *buf, int size, int priority)	//发送数据函数
+{
+	int _size = sizeof(struct send_queue) + size;
+	struct send_queue * squeue = (struct send_queue*)malloc(_size);
+	memset(squeue, 0x00, _size);
+	squeue->size = size;
+	squeue->next = NULL;
+	memcpy(squeue->buf, buf, size);
+	if (priority == 0x01)	//优先发送
+	{
+
+	} else {
+
+	}
+	printf("%s\n", squeue->buf);
+	// send_data(cbase->fd, buf, size);
+	// if (send(fd, buf, buf_size, 0) < 0)
+	// {
+	// 	log_print("error:send fail");
+	// 	return -1;
+	// }
+	return 1;
+}
+#else
+int tcp_client_send(struct client_base*cbase, char *buf, int size)
+{
+	if (send(cbase->fd, buf, size, 0) < 0)
+	{
+		log_print("error:send fail");
+		return -1;
+	}
+	return 1;
+}
+#endif
+
+int get_client_fd(void *cread)
+{
+	struct client_read *read_info = (struct client_read*)cread;
+	return read_info->fd;
+}
+char * get_client_read_buf(void *cread)
+{
+	struct client_read *read_info = (struct client_read*)cread;
+	return read_info->data_buf;
+}
+int get_client_read_size(void *cread)
+{
+	struct client_read *read_info = (struct client_read*)cread;
+	return read_info->data_size;
+}
+
+void tcp_client_end(struct client_base **cbase)
+{
+	if (*cbase == NULL)
+	{
+		return;
+	}
+	if ((*cbase)->fd > 0)
+	{
+		close((*cbase)->fd);
+	}
+	free(*cbase);
+	*cbase = NULL;
+}
 
 #endif
 

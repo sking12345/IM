@@ -12,7 +12,19 @@
 #define CHECK_DELETE 0    // "删除"动作的检测开关(0，关闭；1，打开)
 #define LENGTH(a) ( (sizeof(a)) / (sizeof(a[0])) )
 
+
+typedef struct test
+{
+    char test[0];
+    int test1;
+} test_t;
+
+
 int main() {
+
+    printf("size:%ld\n", sizeof(struct test));
+    return 1;
+
     int a[] = {10, 40, 30, 60, 90, 70, 20, 50, 80};
     int i, ilen = LENGTH(a);
     RBRoot *root = NULL;

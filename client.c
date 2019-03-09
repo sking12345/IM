@@ -1,57 +1,38 @@
-include<stdio.h>
-#include<stdlib.h>
-#include<string.h>
-#include<errno.h>
-#include<sys/types.h>
-#include<sys/socket.h>
-#include<netinet/in.h>
-
-#define MAXLINE 4096
+#include <stdio.h>
+#include <stdlib.h>
+#include "socket.h"
+#include "thread_pool.h"
 
 
-int main(int argc, char** argv) {
-    int    sockfd, n, rec_len;
-    char    recvline[4096], sendline[4096];
-    char    buf[MAXLINE];
-    struct sockaddr_in    servaddr;
+void *read_call(void *arg)
+{
+    return NULL;
+}
 
 
-    if ( argc != 2) {
-        printf("usage: ./client <ipaddress>\n");
-        exit(0);
+int main()
+{
+    struct thread_pool * client_pool = thread_pool_init(1, 10);
+    struct client_base * cbase = tcp_client_init("127.0.0.1", 8888);
+    set_client_thread_pool(cbase, client_pool, read_call);
+    tcp_client_start(cbase);
+    while (1)
+    {
+        char buf[100];
+        if (gets(buf) != NULL)
+        {
+            printf("str = %s\n", buf);
+#if TCP_QUEEU_TYPE == 0x01
+            tcp_client_send(cbase, buf, strlen(buf), 1);
+#else
+            tcp_client_send(cbase, buf, strlen(buf));
+#endif
+        }
+
+
     }
 
-    if ( (sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        printf("create socket error: %s(errno: %d)\n", strerror(errno), errno);
-        exit(0);
-    }
-
-
-    memset(&servaddr, 0, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(8000);
-    if ( inet_pton(AF_INET, argv[1], &servaddr.sin_addr) <= 0) {
-        printf("inet_pton error for %s\n", argv[1]);
-        exit(0);
-    }
-
-
-    if ( connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) < 0) {
-        printf("connect error: %s(errno: %d)\n", strerror(errno), errno);
-        exit(0);
-    }
-    printf("send msg to server: \n");
-    fgets(sendline, 4096, stdin);
-    if ( send(sockfd, sendline, strlen(sendline), 0) < 0) {
-        printf("send msg error: %s(errno: %d)\n", strerror(errno), errno);
-        exit(0);
-    }
-    if ((rec_len = recv(sockfd, buf, MAXLINE, 0)) == -1) {
-        perror("recv error");
-        exit(1);
-    }
-    buf[rec_len]  = '\0';
-    printf("Received : %s ", buf);
-    close(sockfd);
-    exit(0);
+    sleep(10);
+    tcp_client_end(&cbase);
+    return 0;
 }

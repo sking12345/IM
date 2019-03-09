@@ -17,9 +17,9 @@ void * server_read_fun(void *sread)
 	int fd = get_server_read_fd(sread);
 	char *str = get_server_read_data(sread);
 	printf("new msg:%d--%s\n", fd, str);
+	send_data(fd, "xxx", 3);
 	return NULL;
 }
-
 
 int main() {
 	struct thread_pool * server_pool = thread_pool_init(1, 10);
