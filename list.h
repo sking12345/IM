@@ -40,6 +40,7 @@ int list_size(struct list *);
 struct list_node* list_begin(struct list *);
 struct list_node* list_end(struct list *);
 void * list_get_arg(struct list *);
+void destroy_list(struct list **plist);
 
 // for (list_iter_t = begin(), list_iter_t != end(); list_iter_t = list_iter_t->next) {
 // 	/* code */

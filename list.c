@@ -87,7 +87,7 @@ void* list_get_arg(struct list *plist) {
 	return plist->arg;
 }
 
-void list_destroy(struct list **plist) {
+void destroy_list(struct list **plist) {
 	list_clear(*plist);
 	free(*plist);
 	*plist = NULL;
