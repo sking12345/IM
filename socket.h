@@ -1,5 +1,5 @@
-#ifndef SOCKET_H
-#define SOCKET_H
+#ifndef _SOCKET_H_
+#define _SOCKET_H_
 #include "config.h"
 #include<stdio.h>
 #include<errno.h>
@@ -18,6 +18,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+// #include "map.h"
 #if COMPILE_TYPE == 0x00
 #include<event.h>
 #endif
@@ -75,6 +76,7 @@ typedef struct server_read {
 } server_read_cd_t;
 
 typedef struct server_base {
+	int connect_num;	//服务器连接数据
 	struct event_base* base;
 	struct event* ev_listen;
 	void* (*new_accept)(int cfd);

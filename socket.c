@@ -105,6 +105,18 @@ void save_sended_queue(sended_queue_t*sended_queue, send_queue_t*node) {
 
 #if COMPILE_TYPE == 0x00
 
+/**
+ * [tcp_server_new_connect 新的连接数据,后期对新连接的处理]
+ * @param sbase [description]
+ */
+void tcp_server_new_connect(struct server_base* sbase) {
+	sbase->connect_num++;
+}
+void tcp_server_close_connect(struct server_accept* paccept, int fd) {
+	event_free(paccept->ev);
+	close(fd);
+}
+
 struct server_accept * server_accept_new() {
 	struct server_accept* paccept = (struct server_accept*)malloc(sizeof(struct server_accept));
 	return paccept;
@@ -121,6 +133,8 @@ void accept_cb(int fd, short events, void* arg) {
 	evutil_make_socket_nonblocking(sockfd);
 	printf("accept a client %d\n", sockfd);
 	struct server_base *pserver = (struct server_base *)arg;
+	tcp_server_new_connect(pserver);
+
 	struct server_accept *paccept = server_accept_new();
 	if (paccept == NULL) {
 		tcp_server_end(&pserver);
@@ -138,22 +152,15 @@ void accept_cb(int fd, short events, void* arg) {
 
 void socket_read_cb(int fd, short events, void *arg) {
 	struct server_accept *paccept  = (struct server_accept*)arg;
-	// char msg[TCP_APK_SIZE + 1] = {0x00};
-	// int len = read(fd, msg, sizeof(msg));
-	// if ( len <= 0 ) {
-	// 	printf("close %d\n", fd);
-	// 	event_free(paccept->ev);
-	// 	close(fd);
-	// 	return ;
-	// }
 	struct apk_buf recv_apk;
 	int recv_size = sizeof(struct apk_buf);
 	int len = read(fd, &recv_apk, recv_size);
 
 	if ( len <= 0 ) {
 		printf("close %d\n", fd);
-		event_free(paccept->ev);
-		close(fd);
+		// event_free(paccept->ev);
+		// close(fd);
+		tcp_server_close_connect(paccept, fd);
 		return ;
 	}
 	printf("test buf:%s\n", recv_apk.buf);

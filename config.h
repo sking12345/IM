@@ -28,4 +28,6 @@
 #define SEND_DATA_TYPE 0x00	//如果发送失败,则将数据添加到发送队列中
 // #define SEND_DATA_TYPE 0x01 //如果发送失败，直接返回error
 
+#define SERVER_MAX_CONNECT_NUM 100	//服务器最大连接数
+
 #endif

@@ -1,5 +1,5 @@
-#ifndef LOG_H
-#define LOG_H
+#ifndef _LOG_H_
+#define _LOG_H_
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,13 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #define TEST 0x01
-int main()
-{
-#if TEST == 0x00
-	printf("%s\n", "ddd");
-#endif
-#if TEST == 0x01
-	printf("%s\n", "ddd1");
-#endif
+
+
+
+typedef union test {
+	int fd;
+	char *arg;
+} test_t;
+int main() {
+	test_t test = 1;
+	printf("%s\n", "ok");
 	return 0;
 }
