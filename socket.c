@@ -77,8 +77,7 @@ int send_apk(int fd, char *buf, int data_size, int number, int *send_number) {
  * @param  apk [description]
  * @return     [description]
  */
-int send_confirm(int fd, struct apk_buf *apk)
-{
+int send_confirm(int fd, struct apk_buf *apk) {
 	struct apk_buf con_apk;
 	con_apk.status = APK_CONFIRM;
 	send(fd, &con_apk, sizeof(struct apk_buf), 0);
@@ -131,13 +130,7 @@ void tcp_server_new_connect(struct server_base* sbase, int fd) {
 }
 void tcp_server_close_connect(struct server_accept* paccept, int fd) {
 #if TCP_QUEEU_TYPE == 0x01
-	struct cond_recv cond_recv;
-	memcpy(&cond_recv, paccept->pserver->cond_recv + sizeof(struct cond_recv)*fd, sizeof(struct cond_recv));
-	if (cond_recv.status == 0x01)
-	{
-		free(cond_recv.buf);
-		cond_recv.buf = NULL;
-	}
+
 #endif
 	event_free(paccept->ev);
 	close(fd);
@@ -157,8 +150,7 @@ void accept_cb(int fd, short events, void* arg) {
 	socklen_t len = sizeof(client);
 	sockfd = accept(fd, (struct sockaddr*)&client, &len );
 	struct server_base *pserver = (struct server_base *)arg;
-	if (pserver->connect_num >= SERVER_MAX_CONNECT_NUM)
-	{
+	if (pserver->connect_num >= SERVER_MAX_CONNECT_NUM) {
 		log_print("Out of connection");
 		close(fd);
 		return;
@@ -194,33 +186,55 @@ void socket_read_cb(int fd, short events, void *arg) {
 		return ;
 	}
 	//简单数据验证
-	if (recv_apk.status != APK_END && recv_apk.status != APK_NOT_END && recv_apk.status != APK_CONFIRM)
-	{
+	if (recv_apk.status != APK_END && recv_apk.status != APK_NOT_END && recv_apk.status != APK_CONFIRM) {
 		log_print("recv data error");
 		return;
 	}
-
 #if TCP_QUEEU_TYPE == 0x01	//采用了队列
-	struct cond_recv *cond_recv = (struct cond_recv*)malloc(sizeof(struct cond_recv));
-	memcpy(cond_recv, paccept->pserver->cond_recv + sizeof(struct cond_recv)*fd, sizeof(struct cond_recv));
-	if (cond_recv->status == 0x00)
-	{
+
+
+
+	char cond_buf[sizeof(struct cond_recv)] = {0x00};
+	printf("size:%ld\n", sizeof(struct cond_recv));
+	memcpy(&cond_buf, paccept->pserver->cond_recv + sizeof(struct cond_recv)*fd, sizeof(struct cond_recv));
+
+
+	struct cond_recv *cond_recv = (struct cond_recv *)cond_buf;
+
+	if (cond_recv->status == 0x00) {
+		printf("%s\n", "aa" );
 		cond_recv->cfd = fd;
-		cond_recv->buf = (char*)malloc(recv_apk.size + 1);
+		char *buf = (char*)malloc(recv_apk.size);;
+		cond_recv->buf = &buf;
 		cond_recv->status = 0x01;
-		memset(cond_recv->buf, 0x00, recv_apk.size + 1);
+	}
+	if (recv_apk.status == APK_END) {
+		printf("%s\n", "bb");
+		char *buf = *cond_recv->buf;
+		free(buf);
+		buf = NULL;
+		cond_recv->status = 0x00;
+	}
+
+	return;
+
+	// struct cond_recv *cond_recv = (struct cond_recv*)malloc(sizeof(struct cond_recv));
+	// memcpy(cond_recv, paccept->pserver->cond_recv + sizeof(struct cond_recv)*fd, sizeof(struct cond_recv));
+	if (cond_recv->status == 0x00) {
+		cond_recv->cfd = fd;
+		//cond_recv->buf = (char*)malloc(recv_apk.size + 1);
+		cond_recv->status = 0x01;
+		//memset(cond_recv->buf, 0x00, recv_apk.size + 1);
 	}
 
 	int residue = recv_apk.size - recv_apk.number * TCP_APK_SIZE;
-	if (residue > TCP_APK_SIZE)
-	{
+	if (residue > TCP_APK_SIZE) {
 		memcpy(cond_recv->buf + recv_apk.number * TCP_APK_SIZE, &(recv_apk.buf), TCP_APK_SIZE);
 	} else {
 		memcpy(cond_recv->buf + recv_apk.number * TCP_APK_SIZE, &(recv_apk.buf), residue);
 	}
 
-	if (recv_apk.status == APK_NOT_END)
-	{
+	if (recv_apk.status == APK_NOT_END) {
 		memcpy(paccept->pserver->cond_recv + sizeof(struct cond_recv)*fd, cond_recv, sizeof(struct cond_recv));
 		return;
 	} else if (recv_apk.status == APK_END) {
@@ -240,8 +254,9 @@ void socket_read_cb(int fd, short events, void *arg) {
 #if SERVER_READ_TYPE == 0x01
 		paccept->pserver->read_call(sread);
 #endif
+		// paccept->pserver->read_call(sread);
 
-		send_confirm(fd, &recv_apk);	//回复确认已接受
+		//send_confirm(fd, &recv_apk);	//回复确认已接受
 		return;
 	}
 	return;
@@ -287,12 +302,10 @@ void* get_server_read_buf(void *sread) {
 }
 
 
-void fee_server_read_buf(void *sread)
-{
+void fee_server_read_buf(void *sread) {
 	struct server_read * read_t = (struct server_read*)sread;
 	printf("PL:%p\n", *read_t->data_buf);
-	if (*read_t->data_buf != NULL)
-	{
+	if (*read_t->data_buf != NULL) {
 
 		free(*read_t->data_buf);
 		*read_t->data_buf = NULL;
@@ -304,8 +317,7 @@ void fee_server_read_buf(void *sread)
 /**
  * 服务端发送消息
  */
-int tcp_server_send(int fd, void *buf, int size, int priority)
-{
+int tcp_server_send(int fd, void *buf, int size, int priority) {
 
 	return 1;
 }
@@ -347,16 +359,16 @@ struct server_base * tcp_server_init(int port, int listen_num) {
 	return pserver;
 }
 
-void set_server_arg(struct server_base*pserver, void*arg) {
+void set_server_arg(struct server_base * pserver, void*arg) {
 	pserver->arg = arg;
 }
 
-void set_server(struct server_base* pserver, struct thread_pool* pool, void*arg) {
+void set_server(struct server_base * pserver, struct thread_pool * pool, void*arg) {
 	pserver->arg = arg;
 	pserver->thread_pool = pool;
 }
 
-void set_server_call(struct server_base* pserver, void* (*new_accept)(int cfd),
+void set_server_call(struct server_base * pserver, void* (*new_accept)(int cfd),
                      void* (*read_call)(void *sread),
                      void* (*abnormal)(int cfd)) {
 	pserver->new_accept = new_accept;
@@ -419,7 +431,7 @@ struct client_base * tcp_client_init(const char *ipstr, int port) {
 
 	return base;
 }
-void set_client_thread_pool(struct client_base* cbase, struct thread_pool *pool, void*(*read_call)(void *cread)) {
+void set_client_thread_pool(struct client_base * cbase, struct thread_pool * pool, void*(*read_call)(void *cread)) {
 	cbase->thread_pool = pool;
 	cbase->read_call = read_call;
 }
@@ -501,7 +513,7 @@ void *client_send_thread(void *arg) {
 
 #endif
 
-int tcp_client_start(struct client_base* cbase) {
+int tcp_client_start(struct client_base * cbase) {
 #if READ_CALL_TYEP == 0x00	//调用线程池去调用设置的回调函数
 	if (cbase->thread_pool == NULL) {
 		log_print("plase set thread poll");
@@ -547,7 +559,7 @@ int tcp_client_start(struct client_base* cbase) {
 }
 
 #if TCP_QUEEU_TYPE == 0x01
-int tcp_client_send(struct client_base* cbase, char *buf, int size, int priority) {	//发送数据函数
+int tcp_client_send(struct client_base * cbase, char *buf, int size, int priority) {	//发送数据函数
 	int _size = sizeof(struct send_queue) + size;
 	struct send_queue * squeue = (struct send_queue*)malloc(_size);
 	memset(squeue, 0x00, _size);
@@ -594,7 +606,7 @@ int tcp_client_send(struct client_base* cbase, char *buf, int size, int priority
 	return 1;
 }
 #else
-int tcp_client_send(struct client_base*cbase, char *buf, int size) {
+int tcp_client_send(struct client_base * cbase, char *buf, int size) {
 	if (send(cbase->fd, buf, size, 0) < 0) {
 		log_print("error:send fail");
 		return -1;
