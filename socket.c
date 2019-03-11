@@ -28,7 +28,7 @@ int send_apk(int fd, char *buf, int data_size, int number, int *send_number) {
 			apk.number = i;
 			apk.status = APK_NOT_END;
 			memset(apk.buf, 0x00, TCP_APK_SIZE);
-			memcpy(apk.buf, buf + number * TCP_APK_SIZE, TCP_APK_SIZE);
+			memcpy(apk.buf, buf + i * TCP_APK_SIZE, TCP_APK_SIZE);
 			int status = send(fd, &apk, send_size, 0);
 			if (status < 0) {
 				log_print("send apk");
@@ -47,7 +47,8 @@ int send_apk(int fd, char *buf, int data_size, int number, int *send_number) {
 			return -1;
 		}
 	} else {
-		int count = data_size / TCP_APK_SIZE;
+		int count = (data_size / TCP_APK_SIZE) - 1;
+		printf("count:%d\n", count);
 		for (int i = number; i < count; ++i) {
 			apk.number = i;
 			if (i + 1 < count) {
@@ -56,7 +57,7 @@ int send_apk(int fd, char *buf, int data_size, int number, int *send_number) {
 				apk.status = APK_END;
 			}
 			memset(apk.buf, 0x00, TCP_APK_SIZE);
-			memcpy(apk.buf, buf + number * TCP_APK_SIZE, TCP_APK_SIZE);
+			memcpy(apk.buf, buf + i * TCP_APK_SIZE, TCP_APK_SIZE);
 			int status = send(fd, &apk, send_size, 0);
 			if (status < 0) {
 				log_print("send apk");
@@ -66,9 +67,22 @@ int send_apk(int fd, char *buf, int data_size, int number, int *send_number) {
 		}
 	}
 #if TCP_QUEUE_DEBUG == 0x01
-	printf("%s\n", "send_apk success");
+	// printf("%s\n", "send_apk success");
 #endif
 	return 0;
+}
+/**
+ * [send_confirm 恢复确认接受完整的消息]
+ * @param  fd  [description]
+ * @param  apk [description]
+ * @return     [description]
+ */
+int send_confirm(int fd, struct apk_buf *apk)
+{
+	struct apk_buf con_apk;
+	con_apk.status = APK_CONFIRM;
+	send(fd, &con_apk, sizeof(struct apk_buf), 0);
+	return 1;
 }
 
 /**
@@ -109,10 +123,22 @@ void save_sended_queue(sended_queue_t*sended_queue, send_queue_t*node) {
  * [tcp_server_new_connect 新的连接数据,后期对新连接的处理]
  * @param sbase [description]
  */
-void tcp_server_new_connect(struct server_base* sbase) {
+void tcp_server_new_connect(struct server_base* sbase, int fd) {
 	sbase->connect_num++;
+#if TCP_QUEEU_TYPE == 0x01
+
+#endif
 }
 void tcp_server_close_connect(struct server_accept* paccept, int fd) {
+#if TCP_QUEEU_TYPE == 0x01
+	struct cond_recv cond_recv;
+	memcpy(&cond_recv, paccept->pserver->cond_recv + sizeof(struct cond_recv)*fd, sizeof(struct cond_recv));
+	if (cond_recv.status == 0x01)
+	{
+		free(cond_recv.buf);
+		cond_recv.buf = NULL;
+	}
+#endif
 	event_free(paccept->ev);
 	close(fd);
 }
@@ -130,11 +156,17 @@ void accept_cb(int fd, short events, void* arg) {
 	struct sockaddr_in client;
 	socklen_t len = sizeof(client);
 	sockfd = accept(fd, (struct sockaddr*)&client, &len );
+	struct server_base *pserver = (struct server_base *)arg;
+	if (pserver->connect_num >= SERVER_MAX_CONNECT_NUM)
+	{
+		log_print("Out of connection");
+		close(fd);
+		return;
+	}
 	evutil_make_socket_nonblocking(sockfd);
 	printf("accept a client %d\n", sockfd);
-	struct server_base *pserver = (struct server_base *)arg;
-	tcp_server_new_connect(pserver);
 
+	tcp_server_new_connect(pserver, sockfd);
 	struct server_accept *paccept = server_accept_new();
 	if (paccept == NULL) {
 		tcp_server_end(&pserver);
@@ -158,37 +190,83 @@ void socket_read_cb(int fd, short events, void *arg) {
 
 	if ( len <= 0 ) {
 		printf("close %d\n", fd);
-		// event_free(paccept->ev);
-		// close(fd);
 		tcp_server_close_connect(paccept, fd);
 		return ;
 	}
-	printf("test buf:%s\n", recv_apk.buf);
+	//简单数据验证
+	if (recv_apk.status != APK_END && recv_apk.status != APK_NOT_END && recv_apk.status != APK_CONFIRM)
+	{
+		log_print("recv data error");
+		return;
+	}
 
+#if TCP_QUEEU_TYPE == 0x01	//采用了队列
+	struct cond_recv cond_recv;
+	memcpy(&cond_recv, paccept->pserver->cond_recv + sizeof(struct cond_recv)*fd, sizeof(struct cond_recv));
+	if (cond_recv.status == 0x00)
+	{
+		cond_recv.cfd = fd;
+		cond_recv.buf = (char*)malloc(recv_apk.size + 1);
+		cond_recv.status = 0x01;
+		memset(cond_recv.buf, 0x00, recv_apk.size + 1);
+	}
+
+	int residue = recv_apk.size - recv_apk.number * TCP_APK_SIZE;
+	if (residue > TCP_APK_SIZE)
+	{
+		memcpy(cond_recv.buf + recv_apk.number * TCP_APK_SIZE, &(recv_apk.buf), TCP_APK_SIZE);
+	} else {
+		memcpy(cond_recv.buf + recv_apk.number * TCP_APK_SIZE, &(recv_apk.buf), residue);
+	}
+
+	if (recv_apk.status == APK_NOT_END)
+	{
+		memcpy(paccept->pserver->cond_recv + sizeof(struct cond_recv)*fd, &cond_recv, sizeof(struct cond_recv));
+		return;
+	} else if (recv_apk.status == APK_END) {
+		struct server_read sread;
+		sread.fd = fd;
+		sread.data_size = len;
+		sread.ev =  paccept->ev;
+		sread.data_buf = (void*) & (cond_recv.buf);
+		sread.arg = paccept->pserver->arg;
+		cond_recv.status = 0x00;
+
+#if SERVER_READ_TYPE == 0x00
+		thread_add_job(paccept->pserver->thread_pool, paccept->pserver->read_call, (void*)&sread, -1);
+#endif
+#if SERVER_READ_TYPE == 0x01
+		paccept->pserver->read_call(sread);
+#endif
+		memcpy(paccept->pserver->cond_recv + sizeof(struct cond_recv)*fd, &cond_recv, sizeof(struct cond_recv));
+		send_confirm(fd, &recv_apk);	//回复确认已接受
+		return;
+	}
+	return;
+#endif
+
+#if SERVER_READ_TYPE == 0x00
+	struct server_read sread;
+	sread.fd = fd;
+	sread.data_size = len;
+	sread.ev =  paccept->ev;
+	sread.data_buf = (void*)&recv_apk.buf;
+	sread.arg = paccept->pserver->arg;
+	thread_add_job(paccept->pserver->thread_pool, paccept->pserver->read_call, (void*)&sread, -1);
+	return;
+#endif
+
+#if SERVER_READ_TYPE == 0x01
 	struct server_read sread;
 	sread.fd = fd;
 	sread.data_size = len;
 	sread.ev =  paccept->ev;
 	sread.data_buf = recv_apk.buf;
 	sread.arg = paccept->pserver->arg;
-#if TCP_QUEEU_TYPE == 0x01	//采用了队列
-	if (recv_apk.status == APK_NOT_END) {
-
-	} else if (recv_apk.status == APK_END) {
-
-	} else if (recv_apk.status == APK_CONFIRM) {
-
-	} else {
-		log_print("read error");
-	}
-#endif
-#if SERVER_READ_TYPE == 0x00
-	thread_add_job(paccept->pserver->thread_pool, paccept->pserver->read_call, (void*)&sread);
-#endif
-#if SERVER_READ_TYPE == 0x01
 	paccept->pserver->read_call(sread);
+	return;
 #endif
-
+	return;
 }
 //接受数据的连接fd
 int get_server_read_fd(void *sread) {
@@ -201,11 +279,24 @@ int get_server_read_size(void *sread) {
 	return read_t->data_size;
 }
 //接受到的数据
-char* get_server_read_buf(void *sread) {
+void* get_server_read_buf(void *sread) {
 	struct server_read * read_t = (struct server_read*)sread;
-	return read_t->data_buf;
+	return *read_t->data_buf;
 }
+void fee_server_read_buf(void *sread)
+{
+	struct server_read * read_t = (struct server_read*)sread;
+	free(*read_t->data_buf);
+	*read_t->data_buf = NULL;
+}
+/**
+ * 服务端发送消息
+ */
+int tcp_server_send(int fd, void *buf, int size, int priority)
+{
 
+	return 1;
+}
 
 typedef struct sockaddr SA;
 struct server_base * tcp_server_init(int port, int listen_num) {
@@ -268,6 +359,11 @@ int tcp_server_start(struct server_base * pserver, int thread_num) {
 		return -1;
 	}
 #endif
+#if TCP_QUEEU_TYPE == 0x01
+	pserver->cond_recv = (char*)malloc(sizeof(struct cond_recv) * SERVER_MAX_CONNECT_NUM);
+	memset(pserver->cond_recv, 0x00, sizeof(struct cond_recv) * SERVER_MAX_CONNECT_NUM);
+#endif
+
 	if (pserver->read_call == NULL) {
 		log_debug("tcp server start fail,plase set server new data call function", __FILE__, __LINE__, __FUNCTION__);
 		return -1;
@@ -320,24 +416,28 @@ void *client_read_thread(void *arg) {
 	struct client_base* cbase = (struct client_base*)arg;
 	int fd = cbase->fd;
 	while (1) {
-		char msg[TCP_APK_SIZE + 1] = {0x00};
-		int len = read(fd, msg, sizeof(msg));
+
+		struct apk_buf recv_apk;
+		int len = read(fd, &recv_apk, sizeof(struct apk_buf));
 		if ( len <= 0 ) {
 			printf("close %d\n", fd);
 			close(fd);
 			return NULL;
 		}
-		printf("%s\n", msg);
-		struct client_read cread;
-		cread.fd = fd;
-		cread.data_size = len;
-		cread.data_buf = msg;
-#if READ_CALL_TYEP == 0x00	//调用线程池去调用设置的回调函数
-		thread_add_job(cbase->thread_pool, cbase->read_call, (void*)&cread);
-#endif
-#if READ_CALL_TYEP == 0x01	//直接调用设置的回调的函数
-		cbase->read_call(&cread);
-#endif
+		printf("%d\n", recv_apk.status);
+
+		// printf("%s\n", msg);
+
+		// struct client_read cread;
+		// cread.fd = fd;
+		// cread.data_size = len;
+		// cread.data_buf = msg;
+// #if READ_CALL_TYEP == 0x00	//调用线程池去调用设置的回调函数
+// 		thread_add_job(cbase->thread_pool, cbase->read_call, (void*)&cread, -1);
+// #endif
+// #if READ_CALL_TYEP == 0x01	//直接调用设置的回调的函数
+// 		cbase->read_call(&cread);
+// #endif
 	}
 	return NULL;
 }
@@ -465,6 +565,7 @@ int tcp_client_send(struct client_base* cbase, char *buf, int size, int priority
 	cbase->sthread->queue_num++;
 	pthread_mutex_unlock(&(cbase->sthread->mutex));
 	pthread_cond_signal(&(cbase->sthread->cond));
+
 
 #if TCP_QUEUE_DEBUG == 0x01	//测试发送队列
 	log_print("test send queue ...");

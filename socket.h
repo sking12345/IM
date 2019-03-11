@@ -41,6 +41,7 @@ typedef struct apk_buf {
 
 #if TCP_QUEEU_TYPE == 0x01
 
+
 //数据发送队列
 typedef struct send_queue {
 	int fd;
@@ -67,11 +68,19 @@ typedef struct send_thread sended_queue_t;
 /**
  * 读取到数据
  */
+#if TCP_QUEEU_TYPE == 0x01
+typedef struct cond_recv
+{
+	int cfd;
+	int status;	//状态是否已分配内存
+	char *buf;
+} cond_recv_t;
+#endif
 typedef struct server_read {
 	int fd;
 	int data_size;
 	struct event *ev;
-	void *data_buf;
+	void **data_buf;
 	void *arg;
 } server_read_cd_t;
 
@@ -86,6 +95,7 @@ typedef struct server_base {
 #if TCP_QUEEU_TYPE == 0x01
 	struct send_thread *sthread;
 	sended_queue_t * sended_queue;
+	char *cond_recv;
 #endif
 	void *arg;
 } server_base_t;
@@ -112,11 +122,13 @@ void set_server_call(struct server_base* pserver, void* (*new_accept)(int cfd),
                      void* (*read_call)(void *sread),
                      void* (*abnormal)(int cfd));
 int get_server_read_fd(void *sread);
-char* get_server_read_buf(void *sread);
+void* get_server_read_buf(void *sread);
+void fee_server_read_buf(void *sread);
 int get_server_read_size(void *sread);
 
 
 int tcp_server_start(struct server_base*, int thread_num);
+int tcp_server_send(int fd, void *, int size, int priority);
 void tcp_server_end(struct server_base**);
 
 
@@ -144,8 +156,6 @@ typedef struct client_base {
 #endif
 	void *arg;
 } client_base_t;
-
-
 
 struct client_base * tcp_client_init(const char *ip, int port);
 void set_client_thread_pool(struct client_base*, struct thread_pool *pool, void* (*read_call)(void *cread));

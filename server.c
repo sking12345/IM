@@ -15,9 +15,11 @@ void *work(void *arg) {
 
 void * server_read_fun(void *sread) {
 	int fd = get_server_read_fd(sread);
+	printf("%s\n", "new msg");
 	char *str = get_server_read_buf(sread);
 	printf("new msg:%d--%s\n", fd, str);
-	//send_data(fd, "xxx", 3);
+	fee_server_read_buf(sread);
+
 	return NULL;
 }
 

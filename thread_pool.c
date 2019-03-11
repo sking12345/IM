@@ -21,8 +21,9 @@ struct thread_pool * thread_pool_init(int num, int max_queue_num) {
 	return pool;
 }
 
-int thread_add_job(struct thread_pool *pool, void* (*callback_function)(void *arg), void *arg) {
+int thread_add_job(struct thread_pool *pool, void* (*callback_function)(void *arg), void *arg, int thread_index) {
 	if (pool == NULL) {
+		log_print("thread_add_job popl is null");
 		return -1;
 	}
 	struct thread *pthread = &(pool->thread_queue[0]);
