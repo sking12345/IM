@@ -31,7 +31,7 @@ int main() {
 //         }
 
 //     }
-    for (int i = 0; i < 1000; ++i) {
+    for (int i = 0; i < 2000; ++i) {
         const char *buf = "ddddd";
         tcp_client_send(cbase, (char*)buf, strlen(buf) + 1, 1);
     }
