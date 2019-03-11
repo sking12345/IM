@@ -201,44 +201,46 @@ void socket_read_cb(int fd, short events, void *arg) {
 	}
 
 #if TCP_QUEEU_TYPE == 0x01	//采用了队列
-	struct cond_recv cond_recv;
-	memcpy(&cond_recv, paccept->pserver->cond_recv + sizeof(struct cond_recv)*fd, sizeof(struct cond_recv));
-	if (cond_recv.status == 0x00)
+	struct cond_recv *cond_recv = (struct cond_recv*)malloc(sizeof(struct cond_recv));
+	memcpy(cond_recv, paccept->pserver->cond_recv + sizeof(struct cond_recv)*fd, sizeof(struct cond_recv));
+	if (cond_recv->status == 0x00)
 	{
-		cond_recv.cfd = fd;
-		cond_recv.buf = (char*)malloc(recv_apk.size + 1);
-		cond_recv.status = 0x01;
-		memset(cond_recv.buf, 0x00, recv_apk.size + 1);
+		cond_recv->cfd = fd;
+		cond_recv->buf = (char*)malloc(recv_apk.size + 1);
+		cond_recv->status = 0x01;
+		memset(cond_recv->buf, 0x00, recv_apk.size + 1);
 	}
 
 	int residue = recv_apk.size - recv_apk.number * TCP_APK_SIZE;
 	if (residue > TCP_APK_SIZE)
 	{
-		memcpy(cond_recv.buf + recv_apk.number * TCP_APK_SIZE, &(recv_apk.buf), TCP_APK_SIZE);
+		memcpy(cond_recv->buf + recv_apk.number * TCP_APK_SIZE, &(recv_apk.buf), TCP_APK_SIZE);
 	} else {
-		memcpy(cond_recv.buf + recv_apk.number * TCP_APK_SIZE, &(recv_apk.buf), residue);
+		memcpy(cond_recv->buf + recv_apk.number * TCP_APK_SIZE, &(recv_apk.buf), residue);
 	}
 
 	if (recv_apk.status == APK_NOT_END)
 	{
-		memcpy(paccept->pserver->cond_recv + sizeof(struct cond_recv)*fd, &cond_recv, sizeof(struct cond_recv));
+		memcpy(paccept->pserver->cond_recv + sizeof(struct cond_recv)*fd, cond_recv, sizeof(struct cond_recv));
 		return;
 	} else if (recv_apk.status == APK_END) {
-		struct server_read sread;
-		sread.fd = fd;
-		sread.data_size = len;
-		sread.ev =  paccept->ev;
-		sread.data_buf = (void*) & (cond_recv.buf);
-		sread.arg = paccept->pserver->arg;
-		cond_recv.status = 0x00;
+		cond_recv->status = 0x00;
+		memcpy(paccept->pserver->cond_recv + sizeof(struct cond_recv)*fd, cond_recv, sizeof(struct cond_recv));
+
+		struct server_read *sread = (struct server_read*)malloc(sizeof(struct server_read));
+		sread->fd = fd;
+		sread->data_size = len;
+		sread->ev =  paccept->ev;
+		sread->data_buf = (void*) & (cond_recv->buf);
+		sread->arg = paccept->pserver->arg;
 
 #if SERVER_READ_TYPE == 0x00
-		thread_add_job(paccept->pserver->thread_pool, paccept->pserver->read_call, (void*)&sread, -1);
+		thread_add_job(paccept->pserver->thread_pool, paccept->pserver->read_call, (void*)sread, -1);
 #endif
 #if SERVER_READ_TYPE == 0x01
 		paccept->pserver->read_call(sread);
 #endif
-		memcpy(paccept->pserver->cond_recv + sizeof(struct cond_recv)*fd, &cond_recv, sizeof(struct cond_recv));
+
 		send_confirm(fd, &recv_apk);	//回复确认已接受
 		return;
 	}
@@ -246,23 +248,23 @@ void socket_read_cb(int fd, short events, void *arg) {
 #endif
 
 #if SERVER_READ_TYPE == 0x00
-	struct server_read sread;
-	sread.fd = fd;
-	sread.data_size = len;
-	sread.ev =  paccept->ev;
-	sread.data_buf = (void*)&recv_apk.buf;
-	sread.arg = paccept->pserver->arg;
-	thread_add_job(paccept->pserver->thread_pool, paccept->pserver->read_call, (void*)&sread, -1);
+	struct server_read *sread = (struct server_read*)malloc(sizeof(struct server_read));
+	sread->fd = fd;
+	sread->data_size = len;
+	sread->ev =  paccept->ev;
+	sread->data_buf = (void*)&recv_apk.buf;
+	sread->arg = paccept->pserver->arg;
+	thread_add_job(paccept->pserver->thread_pool, paccept->pserver->read_call, (void*)sread, -1);
 	return;
 #endif
 
 #if SERVER_READ_TYPE == 0x01
-	struct server_read sread;
-	sread.fd = fd;
-	sread.data_size = len;
-	sread.ev =  paccept->ev;
-	sread.data_buf = recv_apk.buf;
-	sread.arg = paccept->pserver->arg;
+	struct server_read *sread = (struct server_read*)malloc(sizeof(struct server_read));
+	sread->fd = fd;
+	sread->data_size = len;
+	sread->ev =  paccept->ev;
+	sread->data_buf = recv_apk.buf;
+	sread->arg = paccept->pserver->arg;
 	paccept->pserver->read_call(sread);
 	return;
 #endif
@@ -283,11 +285,21 @@ void* get_server_read_buf(void *sread) {
 	struct server_read * read_t = (struct server_read*)sread;
 	return *read_t->data_buf;
 }
+
+
 void fee_server_read_buf(void *sread)
 {
 	struct server_read * read_t = (struct server_read*)sread;
-	free(*read_t->data_buf);
-	*read_t->data_buf = NULL;
+	printf("PL:%p\n", *read_t->data_buf);
+	if (*read_t->data_buf != NULL)
+	{
+
+		free(*read_t->data_buf);
+		*read_t->data_buf = NULL;
+	} else {
+		printf("%s\n", "xxxxx");
+	}
+
 }
 /**
  * 服务端发送消息

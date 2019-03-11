@@ -19,18 +19,22 @@ int main() {
     set_client_thread_pool(cbase, client_pool, read_call);
     tcp_client_start(cbase);
 
-    while (1) {
-        char buf[100];
-        if (gets(buf) != NULL) {
-            printf("str = %s\n", buf);
-#if TCP_QUEEU_TYPE == 0x01
-            tcp_client_send(cbase, buf, strlen(buf) + 1, 1);
-#else
-            tcp_client_send(cbase, buf, strlen(buf) + 1);
-#endif
-        }
+//     while (1) {
+//         char buf[100];
+//         if (gets(buf) != NULL) {
+//             printf("str = %s\n", buf);
+// #if TCP_QUEEU_TYPE == 0x01
+//             tcp_client_send(cbase, buf, strlen(buf) + 1, 1);
+// #else
+//             tcp_client_send(cbase, buf, strlen(buf) + 1);
+// #endif
+//         }
 
-
+//     }
+    for (int i = 0; i < 10000; ++i)
+    {
+        const char *buf = "ddddd";
+        tcp_client_send(cbase, (char*)buf, strlen(buf) + 1, 1);
     }
 
     sleep(10);
