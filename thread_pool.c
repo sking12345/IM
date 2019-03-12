@@ -21,32 +21,44 @@ struct thread_pool * thread_pool_init(int num, int max_queue_num) {
 	return pool;
 }
 
-int thread_add_job(struct thread_pool *pool, void* (*callback_function)(void *arg), void *arg, int thread_index) {
+int thread_add_job(struct thread_pool *pool, void* (*callback_function)(void *arg),
+                   void *arg, int thread_index,
+                   void* (*finishcall_function)(void *arg)) {
 	if (pool == NULL) {
-		log_print("thread_add_job popl is null");
+		log_print("thread_add_job pool is null");
 		return -1;
 	}
-	struct thread *pthread = &(pool->thread_queue[0]);
-	pthread_mutex_lock(&(pthread->mutex));
-	int queue_num = pthread->queue_num;
-	pthread_mutex_unlock(&(pthread->mutex));
-	for (int i = 0; i < pool->num; i++) {
-		struct thread *thread = &(pool->thread_queue[i]);
-		pthread_mutex_lock(&(thread->mutex));
-		if (pthread->close) {
-			pthread_mutex_unlock(&(pthread->mutex));
-			continue;
+	if (thread_index >= pool->num) {
+		log_print("thread_index >= poll thread num ");
+		return -1;
+	}
+	struct thread *pthread = NULL;
+	if (thread_index >= 0) {
+		pthread = &(pool->thread_queue[thread_index]);
+	} else {
+		pthread = &(pool->thread_queue[0]);
+		pthread_mutex_lock(&(pthread->mutex));
+		int queue_num = pthread->queue_num;
+		pthread_mutex_unlock(&(pthread->mutex));
+		for (int i = 0; i < pool->num; i++) {
+			struct thread *thread = &(pool->thread_queue[i]);
+			pthread_mutex_lock(&(thread->mutex));
+			if (pthread->close) {
+				pthread_mutex_unlock(&(pthread->mutex));
+				continue;
+			}
+			if (thread->queue_num <= queue_num) {
+				pthread = &(pool->thread_queue[i]);
+				queue_num = pthread->queue_num;
+			}
+			pthread_mutex_unlock(&(thread->mutex));
 		}
-		if (thread->queue_num <= queue_num) {
-			pthread = &(pool->thread_queue[i]);
-			queue_num = pthread->queue_num;
-		}
-		pthread_mutex_unlock(&(thread->mutex));
 	}
 	pthread_mutex_lock(&(pthread->mutex));
 	struct thread_job *job = (struct thread_job*)malloc(sizeof(struct thread_job));
 	job->arg = arg;
 	job->callback_function = callback_function;
+	job->finishcall_function = finishcall_function;
 	job->next = NULL;
 	if (pthread->job_head == NULL) {
 		pthread->job_head = pthread->job_tail = job;
@@ -115,6 +127,9 @@ void* thread_function(void* arg) {
 		pthread_mutex_unlock(&(pthread->mutex));
 		if (job != NULL) {
 			(*(job->callback_function))(job->arg);   //线程真正要做的工作，回调函数的调用
+			if (job->finishcall_function != NULL) {
+				(*(job->finishcall_function))(job->arg);   //线程真正要做的工作，回调函数的调用
+			}
 			free(job);
 			job = NULL;
 		}

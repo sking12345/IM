@@ -124,10 +124,11 @@ int get_server_read_fd(void *sread);
 void* get_server_read_buf(void *sread);
 void free_server_read_buf(void **sread);
 int get_server_read_size(void *sread);
+struct server_base* get_server_base(void *sread);
 
 
 int tcp_server_start(struct server_base*, int thread_num);
-int tcp_server_send(int fd, void *, int size, int priority);
+int tcp_server_send(struct server_base * sbase, int fd, void *, int size, int priority);
 void tcp_server_end(struct server_base**);
 
 

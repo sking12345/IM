@@ -15,36 +15,15 @@ void *work(void *arg) {
 
 void * server_read_fun(void *sread) {
 
+	int cfd = get_server_read_fd(sread);
 
-	/*
-	没有调用线程池
-	struct server_read *sread2 = (struct server_read*)sread;
-
-	printf("sread2:%p\n", sread2);
-
-	*/
-
-	//调用线程池
-
-
-	// struct server_read *sread2 = (struct server_read*)sread;
-
-	// printf("sread2:%p\n", sread2);
-
-	// char * buf = (char*)sread2->data_buf;
-
-	// printf("xx::%s\n", buf);
-	// free(buf);
-	// buf = NULL;
-	// free(sread2);
-	// sread2 = NULL;
+	struct server_base *pserver = get_server_base(sread);
 	char *str = get_server_read_buf(sread);
 	printf("%s\n", str);
 	free_server_read_buf(&sread);
-	// struct server_read *sread2 = (struct server_read**)sread;
 
-	// free((struct server_read*)&sread);
-	// (struct server_read**)*sread = NULL;
+	tcp_server_send(pserver, cfd, (void*)"xxxddd", 4, 1);
+
 
 	return NULL;
 }

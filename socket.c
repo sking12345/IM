@@ -102,8 +102,6 @@ void save_sended_queue(sended_queue_t*sended_queue, send_queue_t*node) {
 
 
 
-
-
 #if COMPILE_TYPE == 0x00
 
 /**
@@ -117,9 +115,6 @@ void tcp_server_new_connect(struct server_base* sbase, int fd) {
 #endif
 }
 void tcp_server_close_connect(struct server_accept* paccept, int fd) {
-#if TCP_QUEEU_TYPE == 0x01
-
-#endif
 	event_free(paccept->ev);
 	close(fd);
 	server_accept_free(&paccept);
@@ -179,7 +174,6 @@ void socket_read_cb(int fd, short events, void *arg) {
 		log_print("recv data error");
 		return;
 	}
-#if TCP_QUEEU_TYPE == 0x01	//采用了队列
 	char cond_buf[sizeof(struct cond_recv)] = {0x00};
 	memcpy(&cond_buf, paccept->pserver->cond_recv + sizeof(struct cond_recv)*fd, sizeof(struct cond_recv));
 	struct cond_recv *cond_recv = (struct cond_recv *)cond_buf;
@@ -197,20 +191,18 @@ void socket_read_cb(int fd, short events, void *arg) {
 		memcpy(cond_recv->buf + recv_apk.number * TCP_APK_SIZE, &(recv_apk.buf), residue);
 	}
 	if (recv_apk.status == APK_END) {
-		printf("%s\n", cond_recv->buf);
 		struct server_read *sread = (struct server_read*)malloc(sizeof(struct server_read));
 		sread->fd = fd;
 		sread->data_size = recv_apk.size;
 		sread->ev =  paccept->ev;
 		sread->data_buf = (void*)cond_recv->buf;
-		sread->arg = paccept->pserver->arg;
+		sread->arg = paccept->pserver;
 
 #if SERVER_READ_TYPE == 0x00
-		thread_add_job(paccept->pserver->thread_pool, paccept->pserver->read_call, (void*)sread, -1);
+		thread_add_job(paccept->pserver->thread_pool, paccept->pserver->read_call, (void*)sread, -1, NULL);
 #endif
 		cond_recv->status = 0x00;
 		memcpy(paccept->pserver->cond_recv + sizeof(struct cond_recv)*fd, cond_recv, sizeof(struct cond_recv));
-
 
 #if SERVER_READ_TYPE == 0x01
 		paccept->pserver->read_call(sread);
@@ -218,8 +210,6 @@ void socket_read_cb(int fd, short events, void *arg) {
 		send_confirm(fd, &recv_apk);
 		return;
 	}
-
-#endif
 }
 //接受数据的连接fd
 int get_server_read_fd(void *sread) {
@@ -240,6 +230,11 @@ void* get_server_read_buf(void *sread) {
 	return NULL;
 }
 
+struct server_base* get_server_base(void *sread) {
+	struct server_read * read_t = (struct server_read*)sread;
+	return read_t->arg;
+}
+
 
 void free_server_read_buf(void **sread) {
 	struct server_read * read_t = (struct server_read*)*sread;
@@ -253,8 +248,9 @@ void free_server_read_buf(void **sread) {
 /**
  * 服务端发送消息
  */
-int tcp_server_send(int fd, void *buf, int size, int priority) {
+int tcp_server_send(struct server_base * sbase, int fd, void *buf, int size, int priority) {
 
+	printf("%s\n", (char*)buf);
 	return 1;
 }
 
@@ -382,13 +378,11 @@ void *client_read_thread(void *arg) {
 			close(fd);
 			return NULL;
 		}
-		if (recv_apk.status == APK_CONFIRM)
-		{
+		if (recv_apk.status == APK_CONFIRM) {
 			tcp_client_confirm(cbase, &recv_apk);
 			return NULL;
 		}
-		if (cbase->status == 0x00)
-		{
+		if (cbase->status == 0x00) {
 			cbase->recv_buf = (char*)malloc(recv_apk.size);
 			memset(cbase->recv_buf, 0x00, recv_apk.size);
 			cbase->status = 0x01;
@@ -400,11 +394,10 @@ void *client_read_thread(void *arg) {
 			memcpy(cbase->recv_buf + recv_apk.number * TCP_APK_SIZE, &(recv_apk.buf), residue);
 		}
 
-		if (recv_apk.status == APK_END)
-		{
+		if (recv_apk.status == APK_END) {
 			cbase->status = 0x00;
 #if CLIENT_READ_TYPE == 0x00
-			thread_add_job(cbase->thread_pool, cbase->read_call, (void*)cbase->recv_buf, -1);
+			thread_add_job(cbase->thread_pool, cbase->read_call, (void*)cbase->recv_buf, -1, NULL);
 #endif
 #if CLIENT_READ_TYPE == 0x01
 			cbase->read_call(cbase->recv_buf);
@@ -414,6 +407,7 @@ void *client_read_thread(void *arg) {
 
 	}
 	return NULL;
+
 }
 
 #if TCP_QUEEU_TYPE == 0x01	//发送消息采用队列机制
@@ -508,8 +502,7 @@ int tcp_client_start(struct client_base * cbase) {
 
 #if TCP_QUEEU_TYPE == 0x01
 
-void tcp_client_confirm(struct client_base*cbase, struct apk_buf*apk)
-{
+void tcp_client_confirm(struct client_base*cbase, struct apk_buf*apk) {
 	pthread_mutex_lock(&(cbase->sended_queue->mutex));
 	if (cbase->sended_queue->sq_head == NULL) {
 		return;
@@ -581,8 +574,7 @@ int get_client_read_size(void *cread) {
 
 
 int set_client_call(struct client_base*cbase, void* (*read_call)(void *sread),
-                    void* (*abnormal)(int cfd))
-{
+                    void* (*abnormal)(int cfd)) {
 	cbase->read_call = read_call;
 	cbase->abnormal = abnormal;
 	return 0;
