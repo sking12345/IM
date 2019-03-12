@@ -83,19 +83,24 @@ int send_confirm(int fd, struct apk_buf *apk) {
  */
 void save_sended_queue(sended_queue_t*sended_queue, send_queue_t*node) {
 	if (sended_queue == NULL || node == NULL) {
+		printf("%s\n", "null dd");
 		return;
 	}
+
 	node->next = NULL;
 	//锁住该队列,存入已发送的数据,用于服务器确认接受成功
 	pthread_mutex_lock(&(sended_queue->mutex));
 	if (sended_queue->sq_head == NULL) {
 		sended_queue->sq_head = sended_queue->sq_tail = node;
 	} else {
-		sended_queue->sq_head->next = node;
+		sended_queue->sq_tail->next = node;
+		sended_queue->sq_tail = node;
 	}
 	sended_queue->queue_num++;
 	pthread_mutex_unlock(&(sended_queue->mutex));
 }
+
+
 
 
 
@@ -117,6 +122,7 @@ void tcp_server_close_connect(struct server_accept* paccept, int fd) {
 #endif
 	event_free(paccept->ev);
 	close(fd);
+	server_accept_free(&paccept);
 }
 
 struct server_accept * server_accept_new() {
@@ -373,14 +379,39 @@ void *client_read_thread(void *arg) {
 		struct apk_buf recv_apk;
 		int len = read(fd, &recv_apk, sizeof(struct apk_buf));
 		if ( len <= 0 ) {
-			printf("close %d\n", fd);
 			close(fd);
 			return NULL;
 		}
 		if (recv_apk.status == APK_CONFIRM)
 		{
-			//tcp_client_confirm(cbase, &recv_apk);
+			tcp_client_confirm(cbase, &recv_apk);
+			return NULL;
 		}
+		if (cbase->status == 0x00)
+		{
+			cbase->recv_buf = (char*)malloc(recv_apk.size);
+			memset(cbase->recv_buf, 0x00, recv_apk.size);
+			cbase->status = 0x01;
+		}
+		int residue = recv_apk.size - recv_apk.number * TCP_APK_SIZE;
+		if (residue > TCP_APK_SIZE) {
+			memcpy(cbase->recv_buf + recv_apk.number * TCP_APK_SIZE, &(recv_apk.buf), TCP_APK_SIZE);
+		} else {
+			memcpy(cbase->recv_buf + recv_apk.number * TCP_APK_SIZE, &(recv_apk.buf), residue);
+		}
+
+		if (recv_apk.status == APK_END)
+		{
+			cbase->status = 0x00;
+#if CLIENT_READ_TYPE == 0x00
+			thread_add_job(cbase->thread_pool, cbase->read_call, (void*)cbase->recv_buf, -1);
+#endif
+#if CLIENT_READ_TYPE == 0x01
+			cbase->read_call(cbase->recv_buf);
+#endif
+			return NULL;
+		}
+
 	}
 	return NULL;
 }
@@ -547,6 +578,16 @@ int get_client_read_size(void *cread) {
 	return read_info->data_size;
 }
 
+
+
+int set_client_call(struct client_base*cbase, void* (*read_call)(void *sread),
+                    void* (*abnormal)(int cfd))
+{
+	cbase->read_call = read_call;
+	cbase->abnormal = abnormal;
+	return 0;
+}
+
 void tcp_client_end(struct client_base **cbase) {
 	if (*cbase == NULL) {
 		return;
@@ -555,7 +596,6 @@ void tcp_client_end(struct client_base **cbase) {
 	struct send_queue * head = (*cbase)->sthread->sq_head;
 	while (head != NULL) {
 		node = head;
-		printf("head:%s\n", node->buf);
 		free(node);
 		node = NULL;
 		head = head->next;
@@ -563,7 +603,6 @@ void tcp_client_end(struct client_base **cbase) {
 	head = (*cbase)->sended_queue->sq_head;
 	while (head != NULL) {
 		node = head;
-		printf("head:%s\n", node->buf);
 		free(node);
 		node = NULL;
 		head = head->next;

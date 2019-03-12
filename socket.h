@@ -94,7 +94,7 @@ typedef struct server_base {
 #if TCP_QUEEU_TYPE == 0x01
 	struct send_thread *sthread;
 	sended_queue_t * sended_queue;
-	char *cond_recv;
+	char *cond_recv;	// 存放每个连接的所分配的资源,分包用到
 #endif
 	void *arg;
 } server_base_t;
@@ -148,10 +148,13 @@ typedef struct client_base {
 	char *ip;
 	int port;
 	struct thread_pool *thread_pool;
-	void* (*read_call)(void *cread);
+	void* (*abnormal)(int cfd);
+	void* (*read_call)(void *sread);
 #if TCP_QUEEU_TYPE == 0x01
 	struct send_thread *sthread;
 	sended_queue_t * sended_queue;
+	char *recv_buf;
+	int status;
 #endif
 	void *arg;
 } client_base_t;
@@ -170,6 +173,8 @@ void tcp_client_confirm(struct client_base*cbase, struct apk_buf*apk);
 #else
 int tcp_client_send(struct client_base*, char *buf, int size);	//发送数据函数
 #endif
+int set_client_call(struct client_base*, void* (*read_call)(void *sread),
+                    void* (*abnormal)(int cfd));
 int  get_client_fd(void *cread);
 char* get_client_read_buf(void *cread);
 int  get_client_read_size(void *cread);

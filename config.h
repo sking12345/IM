@@ -8,6 +8,9 @@
 #define SERVER_READ_TYPE 0x00 //读取完数据后添加到线程池任务中
 // #define SERVER_READ_TYPE 0x01 //读取完数据后直接调用回调函数
 
+#define CLIENT_READ_TYPE 0x00 //读取完数据后添加到线程池任务中
+// #define CLIENT_READ_TYPE 0x01 //读取完数据后直接调用回调函数
+
 //有数据读取的回调方式
 #define READ_CALL_TYEP 0x00	//调用线程池,线程回调某个回调函数
 // #define READ_CALL_TYEP 0x01	//直接回调某个函数
