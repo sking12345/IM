@@ -210,7 +210,6 @@ void socket_read_cb(int fd, short events, void *arg) {
 		cond_recv->status = 0x01;
 		memset(cond_recv->buf, 0x00, recv_apk.size + 1);
 	}
-
 	int residue = recv_apk.size - recv_apk.number * TCP_APK_SIZE;
 	if (residue > TCP_APK_SIZE)
 	{
