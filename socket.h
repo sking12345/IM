@@ -72,14 +72,14 @@ typedef struct send_thread sended_queue_t;
 typedef struct cond_recv {
 	int cfd;
 	int status;	//状态是否已分配内存
-	char **buf;
+	char *buf;
 } cond_recv_t;
 #endif
 typedef struct server_read {
 	int fd;
 	int data_size;
 	struct event *ev;
-	void **data_buf;
+	void *data_buf;
 	void *arg;
 } server_read_cd_t;
 
@@ -122,7 +122,7 @@ void set_server_call(struct server_base* pserver, void* (*new_accept)(int cfd),
                      void* (*abnormal)(int cfd));
 int get_server_read_fd(void *sread);
 void* get_server_read_buf(void *sread);
-void fee_server_read_buf(void *sread);
+void free_server_read_buf(void *sread);
 int get_server_read_size(void *sread);
 
 
