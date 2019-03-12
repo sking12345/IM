@@ -122,7 +122,7 @@ void set_server_call(struct server_base* pserver, void* (*new_accept)(int cfd),
                      void* (*abnormal)(int cfd));
 int get_server_read_fd(void *sread);
 void* get_server_read_buf(void *sread);
-void free_server_read_buf(void *sread);
+void free_server_read_buf(void **sread);
 int get_server_read_size(void *sread);
 
 
@@ -165,6 +165,8 @@ int tcp_client_start(struct client_base*);
  */
 #if TCP_QUEEU_TYPE == 0x01
 int tcp_client_send(struct client_base*, char *buf, int size, int priority);	//发送数据函数
+
+void tcp_client_confirm(struct client_base*cbase, struct apk_buf*apk);
 #else
 int tcp_client_send(struct client_base*, char *buf, int size);	//发送数据函数
 #endif

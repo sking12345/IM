@@ -16,7 +16,6 @@
  * @return             [成功返回0，失败返回失败编码]
  */
 int send_apk(int fd, char *buf, int data_size, int number, int *send_number) {
-	printf("buf::%s\n", buf );
 	struct apk_buf apk;
 	int send_size = sizeof(struct apk_buf);
 	apk.size = data_size;
@@ -47,7 +46,6 @@ int send_apk(int fd, char *buf, int data_size, int number, int *send_number) {
 		}
 	} else {
 		int count = (data_size / TCP_APK_SIZE) - 1;
-		printf("count:%d\n", count);
 		for (int i = number; i < count; ++i) {
 			apk.number = i;
 			if (i + 1 < count) {
@@ -65,9 +63,6 @@ int send_apk(int fd, char *buf, int data_size, int number, int *send_number) {
 			}
 		}
 	}
-#if TCP_QUEUE_DEBUG == 0x01
-	// printf("%s\n", "send_apk success");
-#endif
 	return 0;
 }
 /**
@@ -100,20 +95,9 @@ void save_sended_queue(sended_queue_t*sended_queue, send_queue_t*node) {
 	}
 	sended_queue->queue_num++;
 	pthread_mutex_unlock(&(sended_queue->mutex));
-#if TCP_QUEUE_DEBUG == 0x01
-	send_queue_t * test_head = sended_queue->sq_head;
-	send_queue_t *test_node = NULL;
-	while (test_head != NULL) {
-		test_node = test_head;
-		test_head = test_head->next;
-		printf("test save_sended_queue:%s\n", test_node->buf);
-		// free(test_node);
-		// test_node = NULL;
-	}
-	// sended_queue->sq_head = NULL;
-#endif
-
 }
+
+
 
 #if COMPILE_TYPE == 0x00
 
@@ -192,10 +176,7 @@ void socket_read_cb(int fd, short events, void *arg) {
 #if TCP_QUEEU_TYPE == 0x01	//采用了队列
 	char cond_buf[sizeof(struct cond_recv)] = {0x00};
 	memcpy(&cond_buf, paccept->pserver->cond_recv + sizeof(struct cond_recv)*fd, sizeof(struct cond_recv));
-
-
 	struct cond_recv *cond_recv = (struct cond_recv *)cond_buf;
-
 	if (cond_recv->status == 0x00) {
 		cond_recv->cfd = fd;
 		cond_recv->buf = (char*)malloc(recv_apk.size);
@@ -218,27 +199,17 @@ void socket_read_cb(int fd, short events, void *arg) {
 		sread->data_buf = (void*)cond_recv->buf;
 		sread->arg = paccept->pserver->arg;
 
-		printf("sread1:%p\n", sread);
-		// struct server_read **sread1 = &sread;
-		// printf("sread_p1:%p\n", sread1 );
-		// printf("%d\n", (*sread1)->fd);
-
-
 #if SERVER_READ_TYPE == 0x00
 		thread_add_job(paccept->pserver->thread_pool, paccept->pserver->read_call, (void*)sread, -1);
 #endif
-		// paccept->pserver->read_call(sread);
-
-		// free(sread);
-		// sread = NULL;
-		// free(cond_recv->buf);
-		// *cond_recv->buf = NULL;
 		cond_recv->status = 0x00;
 		memcpy(paccept->pserver->cond_recv + sizeof(struct cond_recv)*fd, cond_recv, sizeof(struct cond_recv));
 
+
 #if SERVER_READ_TYPE == 0x01
-		//paccept->pserver->read_call(sread);
+		paccept->pserver->read_call(sread);
 #endif
+		send_confirm(fd, &recv_apk);
 		return;
 	}
 
@@ -247,26 +218,30 @@ void socket_read_cb(int fd, short events, void *arg) {
 //接受数据的连接fd
 int get_server_read_fd(void *sread) {
 	struct server_read * read_t = (struct server_read*)sread;
-	// return read_t->fd;
+	return read_t->fd;
 	return 1;
 }
 //接受到的数据大小
 int get_server_read_size(void *sread) {
 	struct server_read * read_t = (struct server_read*)sread;
-	// return read_t->data_size;
+	return read_t->data_size;
 	return 1;
 }
 //接受到的数据
 void* get_server_read_buf(void *sread) {
 	struct server_read * read_t = (struct server_read*)sread;
-	// return *read_t->data_buf;
+	return read_t->data_buf;
 	return NULL;
 }
 
 
-void free_server_read_buf(void *sread) {
-	struct server_read * read_t = (struct server_read*)sread;
-
+void free_server_read_buf(void **sread) {
+	struct server_read * read_t = (struct server_read*)*sread;
+	char * buf = (char*)read_t->data_buf;
+	free(buf);
+	buf = NULL;
+	free(read_t);
+	read_t = NULL;
 
 }
 /**
@@ -395,7 +370,6 @@ void *client_read_thread(void *arg) {
 	struct client_base* cbase = (struct client_base*)arg;
 	int fd = cbase->fd;
 	while (1) {
-
 		struct apk_buf recv_apk;
 		int len = read(fd, &recv_apk, sizeof(struct apk_buf));
 		if ( len <= 0 ) {
@@ -403,20 +377,10 @@ void *client_read_thread(void *arg) {
 			close(fd);
 			return NULL;
 		}
-		printf("%d\n", recv_apk.status);
-
-		// printf("%s\n", msg);
-
-		// struct client_read cread;
-		// cread.fd = fd;
-		// cread.data_size = len;
-		// cread.data_buf = msg;
-// #if READ_CALL_TYEP == 0x00	//调用线程池去调用设置的回调函数
-// 		thread_add_job(cbase->thread_pool, cbase->read_call, (void*)&cread, -1);
-// #endif
-// #if READ_CALL_TYEP == 0x01	//直接调用设置的回调的函数
-// 		cbase->read_call(&cread);
-// #endif
+		if (recv_apk.status == APK_CONFIRM)
+		{
+			//tcp_client_confirm(cbase, &recv_apk);
+		}
 	}
 	return NULL;
 }
@@ -460,9 +424,7 @@ void *client_send_thread(void *arg) {
 			pthread_mutex_unlock(&(sthread->mutex));
 		} else {
 			save_sended_queue(cbase->sended_queue, snode);	//存入已发送队列
-
 		}
-		printf("%d\n", send_number );
 	}
 }
 
@@ -514,6 +476,22 @@ int tcp_client_start(struct client_base * cbase) {
 }
 
 #if TCP_QUEEU_TYPE == 0x01
+
+void tcp_client_confirm(struct client_base*cbase, struct apk_buf*apk)
+{
+	pthread_mutex_lock(&(cbase->sended_queue->mutex));
+	if (cbase->sended_queue->sq_head == NULL) {
+		return;
+	}
+	struct send_queue * node = cbase->sended_queue->sq_head;
+	cbase->sended_queue->sq_head = cbase->sended_queue->sq_head->next;
+	cbase->sended_queue->queue_num--;
+	free(node);
+	node = NULL;
+	pthread_mutex_unlock(&(cbase->sended_queue->mutex));
+}
+
+
 int tcp_client_send(struct client_base * cbase, char *buf, int size, int priority) {	//发送数据函数
 	int _size = sizeof(struct send_queue) + size;
 	struct send_queue * squeue = (struct send_queue*)malloc(_size);
@@ -522,7 +500,6 @@ int tcp_client_send(struct client_base * cbase, char *buf, int size, int priorit
 	squeue->next = NULL;
 	squeue->fd = get_client_fd(cbase);
 	squeue->send_number = 0;
-
 	memcpy(squeue->buf, buf, size);
 	pthread_mutex_lock(&(cbase->sthread->mutex));
 	if (priority == 0x01) {	//优先发送
@@ -544,19 +521,6 @@ int tcp_client_send(struct client_base * cbase, char *buf, int size, int priorit
 	cbase->sthread->queue_num++;
 	pthread_mutex_unlock(&(cbase->sthread->mutex));
 	pthread_cond_signal(&(cbase->sthread->cond));
-
-
-#if TCP_QUEUE_DEBUG == 0x01	//测试发送队列
-	log_print("test send queue ...");
-	struct send_queue *node = NULL;
-	struct send_queue * head = cbase->sthread->sq_head;
-	while (head != NULL) {
-		node = head;
-		head = head->next;
-		printf("%s\n", node->buf);
-	}
-#endif
-
 
 	return 1;
 }
@@ -586,6 +550,23 @@ int get_client_read_size(void *cread) {
 void tcp_client_end(struct client_base **cbase) {
 	if (*cbase == NULL) {
 		return;
+	}
+	struct send_queue *node = NULL;
+	struct send_queue * head = (*cbase)->sthread->sq_head;
+	while (head != NULL) {
+		node = head;
+		printf("head:%s\n", node->buf);
+		free(node);
+		node = NULL;
+		head = head->next;
+	}
+	head = (*cbase)->sended_queue->sq_head;
+	while (head != NULL) {
+		node = head;
+		printf("head:%s\n", node->buf);
+		free(node);
+		node = NULL;
+		head = head->next;
 	}
 	if ((*cbase)->fd > 0) {
 		close((*cbase)->fd);

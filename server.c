@@ -27,20 +27,20 @@ void * server_read_fun(void *sread) {
 	//调用线程池
 
 
-	struct server_read *sread2 = (struct server_read*)sread;
+	// struct server_read *sread2 = (struct server_read*)sread;
 
-	printf("sread2:%p\n", sread2);
+	// printf("sread2:%p\n", sread2);
 
-	char * buf = (char*)sread2->data_buf;
+	// char * buf = (char*)sread2->data_buf;
 
-	printf("xx::%s\n", buf);
-	free(buf);
-	buf = NULL;
-	free(sread2);
-	sread2 = NULL;
-
-
-
+	// printf("xx::%s\n", buf);
+	// free(buf);
+	// buf = NULL;
+	// free(sread2);
+	// sread2 = NULL;
+	char *str = get_server_read_buf(sread);
+	printf("%s\n", str);
+	free_server_read_buf(&sread);
 	// struct server_read *sread2 = (struct server_read**)sread;
 
 	// free((struct server_read*)&sread);

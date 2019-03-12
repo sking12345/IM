@@ -10,7 +10,7 @@ void *read_call(void *arg) {
 
 
 int main() {
-    struct thread_pool * client_pool = thread_pool_init(1, 10);
+    struct thread_pool * client_pool = thread_pool_init(1, 1000);
     struct client_base * cbase = tcp_client_init("127.0.0.1", 8888);
     if (cbase == NULL) {
         printf("%s\n", "error" );
@@ -31,12 +31,15 @@ int main() {
 //         }
 
 //     }
+    sleep(10);
     for (int i = 0; i < 2000; ++i) {
         const char *buf = "ddddd";
         tcp_client_send(cbase, (char*)buf, strlen(buf) + 1, 1);
     }
-
     sleep(1);
     tcp_client_end(&cbase);
+    printf("%s\n", "end");
+    sleep(15);
+
     return 0;
 }
