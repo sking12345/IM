@@ -69,11 +69,10 @@ typedef struct send_thread sended_queue_t;
  * 读取到数据
  */
 #if TCP_QUEEU_TYPE == 0x01
-typedef struct cond_recv
-{
+typedef struct cond_recv {
 	int cfd;
 	int status;	//状态是否已分配内存
-	char *buf;
+	char **buf;
 } cond_recv_t;
 #endif
 typedef struct server_read {

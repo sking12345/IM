@@ -14,11 +14,25 @@ void *work(void *arg) {
 
 
 void * server_read_fun(void *sread) {
-	int fd = get_server_read_fd(sread);
-	printf("%s\n", "new msg");
-	char *str = get_server_read_buf(sread);
-	printf("new msg:%d--%s\n", fd, str);
-	fee_server_read_buf(sread);
+
+	// printf("sread_p1:%p\n", sread);
+	struct server_read **sread1 = sread;
+	printf("fd1:%d\n", (*sread1)->fd);
+	printf("str:%s\n", *(*sread1)->data_buf);
+
+	// free(*(*sread1)->data_buf);
+	// *(*sread1)->data_buf = NULL;
+	// free(*sread1);
+	// *sread1 = NULL;
+	// struct server_read *tt  = (struct server_read*)sread;
+	// printf("%d\n", tt->fd);
+	//struct server_read * tt = (struct server_read*)sread;
+
+	// int fd = get_server_read_fd(sread);
+	// printf("%s\n", "new msg");
+	// //char *str = get_server_read_buf(sread);
+	// printf("new msg:%d--%s\n", tt->fd, "dd");
+	//fee_server_read_buf(sread);
 
 	return NULL;
 }

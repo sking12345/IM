@@ -31,13 +31,12 @@ int main() {
 //         }
 
 //     }
-    for (int i = 0; i < 10000; ++i)
-    {
+    for (int i = 0; i < 2000; ++i) {
         const char *buf = "ddddd";
         tcp_client_send(cbase, (char*)buf, strlen(buf) + 1, 1);
     }
 
-    sleep(10);
+    sleep(1);
     tcp_client_end(&cbase);
     return 0;
 }
