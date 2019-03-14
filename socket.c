@@ -398,6 +398,8 @@ struct client_base * tcp_client_init(const char *ipstr, int port) {
 		log_print("socket fail");
 		return NULL;
 	}
+
+
 	//2.初始化服务器地址
 	bzero(&serveraddr, sizeof(serveraddr));
 	serveraddr.sin_family = AF_INET;
@@ -409,6 +411,13 @@ struct client_base * tcp_client_init(const char *ipstr, int port) {
 		log_print("connect fail");
 		return NULL;
 	}
+	// int flags;
+	// if ((flags = fcntl(confd, F_GETFL, NULL)) < 0) {
+	// 	return NULL;
+	// }
+	// if (fcntl(confd, F_SETFL, flags | O_NONBLOCK) == -1) {
+	// 	return NULL;
+	// }
 	struct client_base * base = (struct client_base *)malloc(sizeof(struct client_base));
 	base->ip = (char*)ipstr;
 	base->port = port;
