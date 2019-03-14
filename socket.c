@@ -17,13 +17,11 @@
  */
 int send_apk(int fd, char *buf, int data_size, int number, int *send_number) {
 
-	printf("fd:%d\n", fd);
 	struct apk_buf apk;
 	int send_size = sizeof(struct apk_buf);
 	apk.size = data_size;
 	int residue = data_size % TCP_APK_SIZE;
 	if (residue > 0) {
-		printf("%s\n", "send apk");
 		int count = (data_size - residue) / TCP_APK_SIZE;
 		for (int i = number; i < count; ++i) {
 			apk.number = i;
@@ -32,11 +30,10 @@ int send_apk(int fd, char *buf, int data_size, int number, int *send_number) {
 			memcpy(apk.buf, buf + i * TCP_APK_SIZE, TCP_APK_SIZE);
 			int status = send(fd, &apk, send_size, 0);
 			if (status < 0) {
-				log_print("send apk");
+				log_print("send apk err2");
 				*send_number = i;
 				return -1;
 			}
-			printf("%s\n", "ddd");
 		}
 		apk.status = APK_END;
 		apk.number = count;
@@ -45,7 +42,7 @@ int send_apk(int fd, char *buf, int data_size, int number, int *send_number) {
 		int status = send(fd, &apk, send_size, 0);
 		if (status < 0) {
 			*send_number = count;
-			log_print("send apk");
+			log_print("send apk err1");
 			return -1;
 		}
 	} else {
@@ -61,13 +58,12 @@ int send_apk(int fd, char *buf, int data_size, int number, int *send_number) {
 			memcpy(apk.buf, buf + i * TCP_APK_SIZE, TCP_APK_SIZE);
 			int status = send(fd, &apk, send_size, 0);
 			if (status < 0) {
-				log_print("send apk");
+				log_print("send apk erro3");
 				*send_number = i;
 				return -1;
 			}
 		}
 	}
-	printf("%s\n", "send apk");
 	return 0;
 }
 /**
@@ -256,8 +252,7 @@ void free_server_read_buf(void **sread) {
  * 服务端发送消息
  */
 
-void * _tcp_send(void *arg)
-{
+void * _tcp_send(void *arg) {
 	struct server_base * sbase = (struct server_base * )arg;
 	return NULL;
 }
@@ -283,29 +278,32 @@ int tcp_server_send(struct server_base * sbase, int fd, void *buf, int size, int
 
 	int send_number = 0;
 	int send_info = send_apk(fd, buf, size, 0, &send_number);
-	printf("send_info:%d\n", fd );
-#if TCP_QUEEU_TYPE == 0x01
-	if ( send_info < 0) {
-		struct send_queue * snode = (struct send_queue*)malloc(sizeof(struct send_queue) + size);
-		memset(snode, 0x00, sizeof(struct send_queue) + size);
-
-		pthread_mutex_lock(&(sbase->sthread->mutex));
-		snode->send_number = send_number;
-		snode->next = sbase->sthread->sq_head;
-		sbase->sthread->sq_head = snode;
-		sbase->sthread->queue_num++;
-		memcpy(snode->buf, buf, size);
-		pthread_mutex_unlock(&(sbase->sthread->mutex));
-	} else {
-#if TCP_SEND_CONFIRM == 0x01
-		save_sended_queue(sbase->sended_queue, snode);	//存入已发送队列
-#endif
+	if (send_info < 0) {
+		printf("%s\n", "server send error");
 	}
-#endif
-#if TCP_QUEEU_TYPE == 0x01
-	return send_info;
-#endif
+	printf("send buf:%s\n", (char*)buf);
+// #if TCP_QUEEU_TYPE == 0x01
+// 	if ( send_info < 0) {
+// 		struct send_queue * snode = (struct send_queue*)malloc(sizeof(struct send_queue) + size);
+// 		memset(snode, 0x00, sizeof(struct send_queue) + size);
 
+// 		pthread_mutex_lock(&(sbase->sthread->mutex));
+// 		snode->send_number = send_number;
+// 		snode->next = sbase->sthread->sq_head;
+// 		sbase->sthread->sq_head = snode;
+// 		sbase->sthread->queue_num++;
+// 		memcpy(snode->buf, buf, size);
+// 		pthread_mutex_unlock(&(sbase->sthread->mutex));
+// 	} else {
+// #if TCP_SEND_CONFIRM == 0x01
+// 		save_sended_queue(sbase->sended_queue, snode);	//存入已发送队列
+// #endif
+// 	}
+// #endif
+// #if TCP_QUEEU_TYPE == 0x01
+// 	return send_info;
+// #endif
+	return send_info;
 
 }
 
@@ -427,23 +425,20 @@ void set_client_thread_pool(struct client_base * cbase, struct thread_pool * poo
 void *client_read_thread(void *arg) {
 	struct client_base* cbase = (struct client_base*)arg;
 	int fd = cbase->fd;
-	printf("cleint:fd:%d\n", fd);
 	while (1) {
 		struct apk_buf recv_apk;
-		int len = read(fd, &recv_apk, sizeof(struct apk_buf));
-		printf("%s:%d\n", "xxxxllllllll", len);
+		int len = recv(fd, &recv_apk, sizeof(struct apk_buf), 0);
 		if ( len <= 0 ) {
 			close(fd);
 			return NULL;
 		}
-
-		printf("dddd:%s\n", recv_apk.buf);
-#if TCP_SEND_CONFIRM == 0x01	//如果采用消息需要确认,接受确认消息后执行
-		if (recv_apk.status == APK_CONFIRM) {
-			tcp_client_confirm(cbase, &recv_apk);
-			return NULL;
-		}
-#endif
+		printf("recv_apk.status:%d\n", recv_apk.status);
+// #if TCP_SEND_CONFIRM == 0x01	//如果采用消息需要确认,接受确认消息后执行
+// 		if (recv_apk.status == APK_CONFIRM) {
+// 			tcp_client_confirm(cbase, &recv_apk);
+// 			return NULL;
+// 		}
+// #endif
 		if (cbase->status == 0x00) {
 			cbase->recv_buf = (char*)malloc(recv_apk.size);
 			memset(cbase->recv_buf, 0x00, recv_apk.size);
@@ -458,7 +453,7 @@ void *client_read_thread(void *arg) {
 
 		if (recv_apk.status == APK_END) {
 			cbase->status = 0x00;
-			printf("%s\n", cbase->recv_buf);
+			printf("recv server:%s\n", cbase->recv_buf);
 #if CLIENT_READ_TYPE == 0x00
 			thread_add_job(cbase->thread_pool, cbase->read_call, (void*)cbase->recv_buf, -1, NULL);
 #endif

@@ -16,8 +16,11 @@ void *work(void *arg) {
 void * server_read_fun(void *sread) {
 
 	int cfd = get_server_read_fd(sread);
-
 	struct server_base *pserver = get_server_base(sread);
+
+	const char * str1 = "xxxddd";
+	tcp_server_send(pserver, cfd, (void*)str1, strlen(str1), 1);
+
 	char *str = get_server_read_buf(sread);
 	printf("recv:%s\n", str);
 	free_server_read_buf(&sread);
