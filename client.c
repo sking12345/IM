@@ -39,7 +39,7 @@ int main() {
     sleep(1);
     tcp_client_end(&cbase);
     printf("%s\n", "end");
-    sleep(5);
+    sleep(100);
 
     return 0;
 }

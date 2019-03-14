@@ -411,13 +411,6 @@ struct client_base * tcp_client_init(const char *ipstr, int port) {
 		log_print("connect fail");
 		return NULL;
 	}
-	// int flags;
-	// if ((flags = fcntl(confd, F_GETFL, NULL)) < 0) {
-	// 	return NULL;
-	// }
-	// if (fcntl(confd, F_SETFL, flags | O_NONBLOCK) == -1) {
-	// 	return NULL;
-	// }
 	struct client_base * base = (struct client_base *)malloc(sizeof(struct client_base));
 	base->ip = (char*)ipstr;
 	base->port = port;
@@ -441,13 +434,12 @@ void *client_read_thread(void *arg) {
 			close(fd);
 			return NULL;
 		}
-		printf("recv_apk.status:%d\n", recv_apk.status);
-// #if TCP_SEND_CONFIRM == 0x01	//如果采用消息需要确认,接受确认消息后执行
-// 		if (recv_apk.status == APK_CONFIRM) {
-// 			tcp_client_confirm(cbase, &recv_apk);
-// 			return NULL;
-// 		}
-// #endif
+#if TCP_SEND_CONFIRM == 0x01	//如果采用消息需要确认,接受确认消息后执行
+		if (recv_apk.status == APK_CONFIRM) {
+			tcp_client_confirm(cbase, &recv_apk);
+			continue;
+		}
+#endif
 		if (cbase->status == 0x00) {
 			cbase->recv_buf = (char*)malloc(recv_apk.size);
 			memset(cbase->recv_buf, 0x00, recv_apk.size);
@@ -472,7 +464,7 @@ void *client_read_thread(void *arg) {
 #if TCP_SEND_CONFIRM == 0x01
 			send_confirm(fd, &recv_apk);
 #endif
-			return NULL;
+			continue;
 		}
 
 	}
