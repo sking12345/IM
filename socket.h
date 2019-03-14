@@ -126,6 +126,7 @@ void free_server_read_buf(void **sread);
 int get_server_read_size(void *sread);
 struct server_base* get_server_base(void *sread);
 
+void tcp_server_confirm(struct server_base * sbase, struct apk_buf * apk);
 
 int tcp_server_start(struct server_base*, int thread_num);
 int tcp_server_send(struct server_base * sbase, int fd, void *, int size, int priority);

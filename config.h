@@ -2,8 +2,8 @@
 #define CONFIG_H
 
 
-#define COMPILE_TYPE 0x00	//编译方式 0x00:服务端
-// #define COMPILE_TYPE 0x01  //客户端
+// #define COMPILE_TYPE 0x00	//编译方式 0x00:服务端
+#define COMPILE_TYPE 0x01  //客户端
 
 #define SERVER_READ_TYPE 0x00 //读取完数据后添加到线程池任务中
 // #define SERVER_READ_TYPE 0x01 //读取完数据后直接调用回调函数
@@ -17,7 +17,7 @@
 
 
 //通信模式配置
-#define TCP_APK_SIZE 1	//必须为4的倍数
+#define TCP_APK_SIZE 4	//必须为4的倍数
 // #define TCP_QUEEU_TYPE 0x00 //tcp 是否采用队列
 #define TCP_QUEEU_TYPE 0x01 //tcp 采用队列
 #define TCP_QUEUE_DEBUG 0x01
@@ -25,6 +25,8 @@
 // #define TCP_QUEEU_TYPE 0x01 //tcp 是否采用队列
 #define TCP_SEND_MAX_QUEUE 10	//发送数据的最大队列数
 // #define TCP_SEND_TYPE false //发送数据是否采用发送队列
+#define TCP_SEND_CONFIRM 0x00	//不需要发送消息确认
+// #define TCP_SEND_CONFIRM 0x01 //需要发送消息确认
 
 
 //send 发送数据方式

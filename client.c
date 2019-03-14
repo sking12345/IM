@@ -32,7 +32,7 @@ int main() {
 
 //     }
     sleep(1);
-    for (int i = 0; i < 2000; ++i) {
+    for (int i = 0; i < 2; ++i) {
         const char *buf = "ddddd";
         tcp_client_send(cbase, (char*)buf, strlen(buf) + 1, 1);
     }

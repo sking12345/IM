@@ -19,11 +19,10 @@ void * server_read_fun(void *sread) {
 
 	struct server_base *pserver = get_server_base(sread);
 	char *str = get_server_read_buf(sread);
-	printf("%s\n", str);
+	printf("recv:%s\n", str);
 	free_server_read_buf(&sread);
 
 	tcp_server_send(pserver, cfd, (void*)"xxxddd", 4, 1);
-
 
 	return NULL;
 }
