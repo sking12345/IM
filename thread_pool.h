@@ -8,9 +8,9 @@
 #include "log.h"
 
 typedef struct thread_job { //线程任务
-	void* (*callback_function)(void *arg);    //线程回调函数
+	void* (*callback_function)(void **arg);    //线程回调函数
 	void* (*finishcall_function)(void *arg);    //线程回调函数
-	void *arg;                                //回调函数参数
+	void **arg;                                //回调函数参数
 	struct thread_job *next;
 
 } thread_job_t;
@@ -38,8 +38,8 @@ struct thread_pool * thread_pool_init(int thread_num, int max_queue_num);
  * int thread_index = -1:随机
  * >=0;<thread_num;
  */
-int thread_add_job(struct thread_pool *, void* (*callback_function)(void *arg),
-                   void *arg, int thread_index,
+int thread_add_job(struct thread_pool *, void* (*callback_function)(void **arg),
+                   void **arg, int thread_index,
                    void* (*finishcall_function)(void *arg));
 
 int thread_pool_destroy(struct thread_pool **pool);

@@ -3,59 +3,33 @@
 #include <string.h>
 #define TEST 0x01
 
+typedef struct test {
 
-
-typedef union test {
-	int fd;
-	char *arg;
+	char *buf;
 } test_t;
 
-typedef struct test_t
-{
-	int fd;
-	char * arg;
-} test_t_t;
-
-
-void test(char *buf, int fd)
-{
-	struct test_t tt;
-
-	memcpy( &tt, buf + fd * sizeof(struct test_t), sizeof(struct test_t));
-	printf("%d\n", tt.fd);
+char * new_mall() {
+	char * buf = (char*)malloc(10);
+	return buf;
 }
 
-char *test1(int count)
-{
-	char * buf = (char*)malloc(sizeof(struct test_t) * 10);
-	memset(buf, 0x00, sizeof(struct test_t) * 10);
-	for (int i = 4; i < 10; ++i)
-	{
-		struct test_t tt;
-		tt.fd = i;
-		tt.arg = NULL;
-		memcpy(buf + i * sizeof(struct test_t), &tt, sizeof(struct test_t));
-	}
-	return buf;
+void  free_mall(struct test * tt) {
+	free(tt->buf);
+	tt->buf = NULL;
 }
 
 int main() {
 
-	char *buf = test1(10);
+	char *buf = new_mall();
+	printf("%p\n", buf);
 
-	printf("%s\n", "x---------");
-	test(buf, 1);
-	test(buf, 5);
-	test(buf, 8);
-	test(buf, 4);
-	// for (int i = 0; i < 10; ++i)
-	// {
-	// 	struct test_t tt;
-	// 	tt.fd = i;
-	// 	tt.arg = NULL;
-	// 	memcpy( &tt, buf + i * sizeof(struct test_t), sizeof(struct test_t));
-	// 	printf("%d\n", tt.fd);
-	// }
+	struct test *tt = (struct test*)malloc(sizeof(struct test));
+	tt->buf = buf;
+	printf("%p\n", tt->buf );
+	free_mall(tt);
+	printf("%p\n", tt->buf );
+	free(tt);
+	tt = NULL;
 
 	return 0;
 }

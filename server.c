@@ -5,41 +5,14 @@
 // #include "log.h"
 
 
-void *work(void *arg) {
-	int fd = *(int*)arg;
-
-	printf("%s:%d\n", "ddd", fd);
-	return NULL;
-}
 
 
-void * server_read_fun(void *sread) {
-
-	int cfd = get_server_read_fd(sread);
-	struct server_base *pserver = get_server_base(sread);
-
-	const char * str1 = "xxxddd";
-	tcp_server_send(pserver, cfd, (void*)str1, strlen(str1), 1);
-
-	char *str = get_server_read_buf(sread);
-	printf("recv:%s\n", str);
-	free_server_read_buf(&sread);
-
-	tcp_server_send(pserver, cfd, (void*)"xxxddd", 4, 1);
-
-	return NULL;
-}
 
 int main() {
 
 
-	struct thread_pool * server_pool = thread_pool_init(1, 10);
-	struct server_base* pserver = tcp_server_init(8888, 10);
-	set_server_call(pserver, NULL, server_read_fun, NULL);
-	set_server(pserver, server_pool, NULL);
-	tcp_server_start(pserver, 10);
-	tcp_server_end(&pserver);
-
+	struct server_base* sbase = tcp_server_init(8888, 10, 100, NULL);
+	tcp_server_start(sbase, NULL, NULL, NULL, NULL);
 
 	// return 0;
 	// int fd = 1;
