@@ -281,28 +281,6 @@ int tcp_server_send(struct server_base * sbase, int fd, void *buf, int size, int
 	if (send_info < 0) {
 		printf("%s\n", "server send error");
 	}
-	printf("send buf:%s\n", (char*)buf);
-// #if TCP_QUEEU_TYPE == 0x01
-// 	if ( send_info < 0) {
-// 		struct send_queue * snode = (struct send_queue*)malloc(sizeof(struct send_queue) + size);
-// 		memset(snode, 0x00, sizeof(struct send_queue) + size);
-
-// 		pthread_mutex_lock(&(sbase->sthread->mutex));
-// 		snode->send_number = send_number;
-// 		snode->next = sbase->sthread->sq_head;
-// 		sbase->sthread->sq_head = snode;
-// 		sbase->sthread->queue_num++;
-// 		memcpy(snode->buf, buf, size);
-// 		pthread_mutex_unlock(&(sbase->sthread->mutex));
-// 	} else {
-// #if TCP_SEND_CONFIRM == 0x01
-// 		save_sended_queue(sbase->sended_queue, snode);	//存入已发送队列
-// #endif
-// 	}
-// #endif
-// #if TCP_QUEEU_TYPE == 0x01
-// 	return send_info;
-// #endif
 	return send_info;
 
 }
