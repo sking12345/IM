@@ -14,6 +14,7 @@ char * new_mall() {
 }
 
 void  free_mall(struct test * tt) {
+
 	free(tt->buf);
 	tt->buf = NULL;
 }

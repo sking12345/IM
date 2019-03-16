@@ -33,7 +33,7 @@ typedef struct apk_buf {
 	char only_number[16];	//数据唯一编号,struct send_queue 的编号一样,用于服务器确认接受到的什么数据
 	int verify;
 	int size;
-	char buf[TCP_APK_SIZE];
+	char buf[TCP_APK_SIZE + 1];
 } apk_buf_t;
 
 int tcp_send(int fd, void *, int size);
@@ -44,6 +44,8 @@ int tcp_send(int fd, void *, int size);
 
 typedef struct accepts_event {
 	int cfd;
+	int status;
+	int size;
 	struct event *evt;
 	char *recv_buf;
 } server_accept_t;
@@ -62,12 +64,6 @@ typedef struct server_base {
 } server_base_t;
 
 
-
-
-struct server_accept * server_accept_new();
-
-void server_accept_free(struct server_accept**);
-
 void accept_cb(int fd, short events, void* arg);
 void socket_read_cb(int fd, short events, void *arg);
 
@@ -77,11 +73,55 @@ int tcp_server_start(struct server_base*, struct thread_pool *, void* (*new_acce
 
 void tcp_server_end(struct server_base**);
 #else
+typedef struct client_base {
+	int sfd;
+	char *ip;
+	int port;
+	struct thread_pool *thread_pool;
+	void* (*abnormal)(int cfd);
+	void* (*read_call)(void **recv_buf);
+	void *arg;
+} client_base_t;
+
+struct client_base * tcp_client_init(const char *ip, int port);
+int tcp_client_start(struct client_base *, void* (*abnormal)(int cfd), void* (*read_call)(void **recv_buf));
 
 #endif
 
 
+
+
+
+
+
 #endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -32,6 +32,7 @@ int thread_add_job(struct thread_pool *pool, void* (*callback_function)(void **a
 		log_print("thread_index >= poll thread num ");
 		return -1;
 	}
+	printf("%s\n", "start..." );
 	struct thread *pthread = NULL;
 	if (thread_index >= 0) {
 		pthread = &(pool->thread_queue[thread_index]);
@@ -69,6 +70,7 @@ int thread_add_job(struct thread_pool *pool, void* (*callback_function)(void **a
 	pthread->queue_num++;
 	pthread_mutex_unlock(&(pthread->mutex));
 	pthread_cond_signal(&(pthread->cond));
+	printf("%s\n", "end..." );
 	return 0;
 }
 

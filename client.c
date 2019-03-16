@@ -5,41 +5,32 @@
 
 
 void *read_call(void *arg) {
-    return NULL;
+	return NULL;
 }
 
 
 int main() {
-    struct thread_pool * client_pool = thread_pool_init(1, 1000);
-    struct client_base * cbase = tcp_client_init("127.0.0.1", 8888);
-    if (cbase == NULL) {
-        printf("%s\n", "error" );
-        return 0;
-    }
-    set_client_thread_pool(cbase, client_pool, read_call);
-    tcp_client_start(cbase);
 
-//     while (1) {
-//         char buf[100];
-//         if (gets(buf) != NULL) {
-//             printf("str = %s\n", buf);
-// #if TCP_QUEEU_TYPE == 0x01
-//             tcp_client_send(cbase, buf, strlen(buf) + 1, 1);
-// #else
-//             tcp_client_send(cbase, buf, strlen(buf) + 1);
-// #endif
-//         }
+	struct client_base * cbase = tcp_client_init("127.0.0.1", 8888);
+	if (cbase == NULL)
+	{
+		printf("%s\n", "err");
+		return 0;
+	}
+	int fd = tcp_client_start(cbase, NULL, NULL);
+	// while(1)
+	// {
+	// 	const char *buf  = "ddddd";
+	// 	tcp_send(fd,(void*)buf,strlen(buf));
+	// 	sleep(1);
 
-//     }
-    sleep(1);
-    for (int i = 0; i < 100000; ++i) {
-        const char *buf = "ddddd";
-        tcp_client_send(cbase, (char*)buf, strlen(buf) + 1, 1);
-    }
-    sleep(1);
-    tcp_client_end(&cbase);
-    printf("%s\n", "end");
-    sleep(100);
-
-    return 0;
+	// }
+	for (int i = 0; i < 1000; ++i)
+	{
+		const char *buf  = "ddddd";
+		tcp_send(fd, (void*)buf, strlen(buf));
+		// sleep(1);
+	}
+	sleep(10);
+	return 0;
 }
