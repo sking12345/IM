@@ -74,6 +74,7 @@ int thread_add_job(struct thread_pool *pool, void* (*callback_function)(void *ar
 
 	}
 	pthread->queue_num++;
+	printf("pthread->queue_num:%d\n", pthread->queue_num);
 	pthread_mutex_unlock(&(pthread->mutex));
 	pthread_cond_signal(&(pthread->cond));
 
@@ -133,7 +134,9 @@ void* thread_function(void* arg) {
 			pthread->job_head = pthread->job_head->next;
 			pthread->queue_num--;
 		}
+		printf("pthread->queue_num----------:%d\n", pthread->queue_num);
 		pthread_mutex_unlock(&(pthread->mutex));
+
 		if (job != NULL) {
 			(*(job->callback_function))(job->arg);   //线程真正要做的工作，回调函数的调用
 			free(job);

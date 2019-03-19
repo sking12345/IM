@@ -15,25 +15,23 @@ void *work(void *arg)
 
 void test(struct thread_pool * pool)
 {
-	char *str_arr[] = {
-		"dddd11ooosodfosdfoaosfodsofdofdddd11ooosodfosdfoaosfodsofdofdddd11dddd11ooosodfosdfoaosfodsofdofdddd11ooosodfosdfo",
-		"ooosodfosdfoaosfodsofdofdddd11ooosodfosdfoaosfodsofdofdddooosodfosdfoaosfodsofdofdddd11ooosodfosdfoaosfodsofdofddd",
-		"d11ooosodfosdfoaosfodsofdofd11ooosodfosdfoaosfodsofdofd11ooosodfosdfoaosfodsofdofaasfasdfadfsdfsfddddlllslslslsssd",
-		"d11ooosodfosdfoaosfodsofdofaasfasdfadfsdfsfd11ooosodfosdfoaosfodsofdofaasfasdfadfsdfsflllllllllllllllllllllssslsls",
-		"d11ooosodfosdfoaosfodsofdofaasfasdfadfsdfsfddddlllslslslsd11ooosodfosdfoaosfodsofdofaasfasdfadfsdfsfddddlllslslsls",
-	};
+	char *str1 = "dddd11ooosodfosdfoaosfodsofdofdddd11ooosodfosdfoaosfodsofdofdddd11dddd11ooosodfosdfoaosfdddd11ooosodfosdfoaosfodsofdofdddd11ooosodfosdfoaosfodsofdofdddd11dddd11ooosodfosdfoaosf";
+
 	for (int i = 0; i < 1000000; ++i)
 	{
-		char *str1 = str_arr[i % 4];
+
 		char *buf1 = (char*)malloc(strlen(str1) + 1);
-		memset(buf1, 0x00, strlen(str1) + 1);
+		// printf("%ld\n", strlen(str1));
+
 		if (buf1 != NULL)
 		{
+			memset(buf1, 0x00, strlen(str1) + 1);
 			memcpy(buf1, str1, strlen(str1));
 			thread_add_job(pool, work, (void*)buf1, strlen(str1) + 1, -1);
 			free(buf1);
 			buf1 = NULL;
 		}
+
 	}
 }
 
@@ -48,19 +46,19 @@ int main() {
 	// char *buf = (char*)malloc(strlen(str));
 	// memcpy(buf, str, strlen(str));
 	// //
-	struct thread_pool * pool = thread_pool_init(10, 10);
+	struct thread_pool * pool = thread_pool_init(3, 10);
 	// thread_add_job(pool, work, (void**)&buf, -1, NULL);
 
 	sleep(5);
 	int num = 0;
-	int count = 5;
+	int count = 150;
 	while (count--)
 	{
 		test(pool);
 		num++;
 		printf("%s\n", "new start" );
 		printf("num-------:%d\n", num);
-		sleep(10);
+		sleep(15);
 	}
 
 
