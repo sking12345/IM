@@ -9,39 +9,7 @@
 void *work(void *arg)
 {
 	char * buf = (char*)arg;
-	if (buf == NULL)
-	{
-		printf("%p\n", buf);
-		return NULL;
-	}
-	printf("work_buf: %s\n",  buf);
-	return NULL;
-}
-
-void *wor2k(void **arg)
-{
-	char ** buf = (char**)arg;
-	if (*buf == 0x0)
-	{
-		printf("%p\n", *buf);
-		return NULL;
-	}
-	printf("work_buf: %s\n",  *buf);
-	free(*buf);
-	*buf = NULL;
-
-	return NULL;
-}
-
-void *work1(void *arg)
-{
-	char * buf = (char*)arg;
-	if (buf == NULL)
-	{
-		printf("erorr-------------------------------------------%p\n", buf);
-		return NULL;
-	}
-	printf("work_buf: %p\n",  buf);
+	// printf("work_buf: %s\n",  buf);
 	return NULL;
 }
 
@@ -57,29 +25,15 @@ void test(struct thread_pool * pool)
 	for (int i = 0; i < 1000000; ++i)
 	{
 		char *str1 = str_arr[i % 4];
-		// thread_add_job(pool, work1, (void*)str1, -1, NULL);
-		// work1((void*)str1);
 		char *buf1 = (char*)malloc(strlen(str1) + 1);
 		memset(buf1, 0x00, strlen(str1) + 1);
 		if (buf1 != NULL)
 		{
-			// printf("%d\n", i );
 			memcpy(buf1, str1, strlen(str1));
-			//printf("buf1::::%p--%p\n", &buf1, buf1 );
 			thread_add_job(pool, work, (void*)buf1, strlen(str1) + 1, -1);
-			//printf("end::%p\n", buf1);
-			// wor2k((void**)&buf1);
-
-			// printf("buf1::::%s--%p\n", buf1, buf1 );
 			free(buf1);
 			buf1 = NULL;
-		} else {
-			printf("%s\n", "xxxdrror");
 		}
-
-		// printf("malloc1::%p\n", buf1);
-		// printf("buf1:%d -- %p\n", i, buf1);
-		// sleep(1);
 	}
 }
 
@@ -94,7 +48,7 @@ int main() {
 	// char *buf = (char*)malloc(strlen(str));
 	// memcpy(buf, str, strlen(str));
 	// //
-	struct thread_pool * pool = thread_pool_init(3, 10);
+	struct thread_pool * pool = thread_pool_init(10, 10);
 	// thread_add_job(pool, work, (void**)&buf, -1, NULL);
 
 	sleep(5);

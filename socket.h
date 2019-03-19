@@ -89,11 +89,6 @@ int tcp_client_start(struct client_base *, void* (*abnormal)(int cfd), void* (*r
 #endif
 
 
-
-
-
-
-
 #endif
 
 
