@@ -9,6 +9,7 @@ struct thread_pool * thread_pool_init(int num, int max_queue_num) {
 	pool->max_queue_num = max_queue_num;
 	pool->thread_queue = (struct thread *)malloc(sizeof(struct thread) * num);
 	for (int i = 0; i < num; i++) {
+
 		pthread_cond_init(&(pool->thread_queue[i].cond), NULL);
 		pthread_cond_init(&(pool->thread_queue[i].empty_cond), NULL);
 		pthread_mutex_init(&(pool->thread_queue[i].mutex), NULL);
@@ -16,14 +17,14 @@ struct thread_pool * thread_pool_init(int num, int max_queue_num) {
 		pool->thread_queue[i].queue_num = 0;
 		pool->thread_queue[i].job_head = NULL;
 		pool->thread_queue[i].job_tail = NULL;
+		pool->thread_queue[i].seq = i;
 		pthread_create(&(pool->thread_queue[i].pid), NULL, thread_function, (void *)&pool->thread_queue[i]);
 	}
 	return pool;
 }
 
-int thread_add_job(struct thread_pool *pool, void* (*callback_function)(void **arg),
-                   void **arg, int thread_index,
-                   void* (*finishcall_function)(void *arg)) {
+int thread_add_job(struct thread_pool *pool, void* (*callback_function)(void *arg),
+                   void *arg, int arg_size, int thread_index) {
 	if (pool == NULL) {
 		log_print("thread_add_job pool is null");
 		return -1;
@@ -32,10 +33,11 @@ int thread_add_job(struct thread_pool *pool, void* (*callback_function)(void **a
 		log_print("thread_index >= poll thread num ");
 		return -1;
 	}
-	printf("%s\n", "start..." );
+
 	struct thread *pthread = NULL;
 	if (thread_index >= 0) {
 		pthread = &(pool->thread_queue[thread_index]);
+
 	} else {
 		pthread = &(pool->thread_queue[0]);
 		pthread_mutex_lock(&(pthread->mutex));
@@ -51,26 +53,30 @@ int thread_add_job(struct thread_pool *pool, void* (*callback_function)(void **a
 			if (thread->queue_num <= queue_num) {
 				pthread = &(pool->thread_queue[i]);
 				queue_num = pthread->queue_num;
+				pthread_mutex_unlock(&(thread->mutex));
+				break;
 			}
 			pthread_mutex_unlock(&(thread->mutex));
 		}
 	}
 	pthread_mutex_lock(&(pthread->mutex));
-	struct thread_job *job = (struct thread_job*)malloc(sizeof(struct thread_job));
-	job->arg = arg;
+	struct thread_job *job = (struct thread_job*)malloc(sizeof(struct thread_job) + arg_size);
+	memset(job, 0x00, sizeof(struct thread_job) + arg_size);
+	memcpy(job->arg, arg, arg_size);
 	job->callback_function = callback_function;
-	job->finishcall_function = finishcall_function;
 	job->next = NULL;
 	if (pthread->job_head == NULL) {
+
 		pthread->job_head = pthread->job_tail = job;
 	} else {
 		pthread->job_tail->next = job;
 		pthread->job_tail = job;
+
 	}
 	pthread->queue_num++;
 	pthread_mutex_unlock(&(pthread->mutex));
 	pthread_cond_signal(&(pthread->cond));
-	printf("%s\n", "end..." );
+
 	return 0;
 }
 
@@ -98,11 +104,9 @@ int thread_pool_destroy(struct thread_pool **pool) {
 
 void* thread_function(void* arg) {
 	struct thread *pthread = (struct thread*)arg;
-	struct thread_job * job = NULL;
 	while (1) {
 		pthread_mutex_lock(&(pthread->mutex));
-		while (pthread->queue_num == 0) { //队列为空时，就等待队列非空
-
+		while (pthread->queue_num <= 0 ) { //队列为空时，就等待队列非空
 			pthread_cond_wait(&(pthread->cond), &(pthread->mutex));
 		}
 		if (pthread->close) {	//关闭线程
@@ -110,6 +114,7 @@ void* thread_function(void* arg) {
 				struct thread_job * node = NULL;
 				struct thread_job * head = pthread->job_head;
 				while (head != NULL) {
+					printf("%s\n", "no free");
 					node = head;
 					head = head->next;
 					free(node);
@@ -117,10 +122,12 @@ void* thread_function(void* arg) {
 					pthread->queue_num--;
 				}
 			}
+			printf("close:%d\n", pthread->seq );
 			pthread_mutex_unlock(&(pthread->mutex));
 			pthread_cond_signal(&(pthread->empty_cond));
 			pthread_exit(NULL);
 		}
+		struct thread_job * job = NULL;
 		if (pthread->job_head != NULL) {
 			job = pthread->job_head;
 			pthread->job_head = pthread->job_head->next;
@@ -129,9 +136,6 @@ void* thread_function(void* arg) {
 		pthread_mutex_unlock(&(pthread->mutex));
 		if (job != NULL) {
 			(*(job->callback_function))(job->arg);   //线程真正要做的工作，回调函数的调用
-			if (job->finishcall_function != NULL) {
-				(*(job->finishcall_function))(job->arg);   //线程真正要做的工作，回调函数的调用
-			}
 			free(job);
 			job = NULL;
 		}
