@@ -33,7 +33,7 @@ typedef struct apk_buf {
 	char only_number[16];	//数据唯一编号,struct send_queue 的编号一样,用于服务器确认接受到的什么数据
 	int verify;
 	int size;
-	char buf[TCP_APK_SIZE + 1];
+	char buf[TCP_APK_SIZE];
 } apk_buf_t;
 
 int tcp_send(int fd, void *, int size);
@@ -41,6 +41,22 @@ int tcp_send(int fd, void *, int size);
 #if COMPILE_TYPE == 0x00
 #include<event.h>
 
+
+
+
+typedef struct server_base {
+	int close;
+	int max_connect;
+	int connect_num;	//服务器连接数据
+	struct event_base*base;
+	struct event*ev_listen;
+	void* (*new_accept)(int cfd);
+	void* (*abnormal)(int cfd);
+	void* (*read_call)(int cfd, void * read_buf, struct server_base *base);
+	struct thread_pool *thread_pool;
+	void *arg;
+	char * conencts_info;
+} server_base_t;
 
 typedef struct accepts_event {
 	int cfd;
@@ -50,18 +66,12 @@ typedef struct accepts_event {
 	char *recv_buf;
 } server_accept_t;
 
-typedef struct server_base {
-	int max_connect;
-	int connect_num;	//服务器连接数据
-	struct event_base*base;
-	struct event*ev_listen;
-	void* (*new_accept)(int cfd);
-	void* (*abnormal)(int cfd);
-	void* (*read_call)(void **recv_buf);
-	struct thread_pool *thread_pool;
-	void *arg;
-	char * conencts_info;
-} server_base_t;
+typedef struct read_buf
+{
+	int cfd;
+	struct server_base * sbase;
+	char buf[0];
+} read_buf_t;
 
 
 void accept_cb(int fd, short events, void* arg);
@@ -69,23 +79,28 @@ void socket_read_cb(int fd, short events, void *arg);
 
 struct server_base* tcp_server_init(int port, int listen_num, int max_connect, void *arg);
 
-int tcp_server_start(struct server_base*, struct thread_pool *, void* (*new_accept)(int cfd), void* (*abnormal)(int cfd), void* (*read_call)(void **recv_buf));
+int tcp_server_start(struct server_base*, struct thread_pool *, void* (*new_accept)(int cfd),
+                     void* (*abnormal)(int cfd),
+                     void* (*read_call)(int cfd, void * read_buf, struct server_base *base));
 
 void tcp_server_end(struct server_base**);
+int tcp_server_closed(struct server_base*, int fd);
 #else
 typedef struct client_base {
 	int sfd;
 	char *ip;
 	int port;
+	int close; //连接状态
 	struct thread_pool *thread_pool;
 	void* (*abnormal)(int cfd);
-	void* (*read_call)(void **recv_buf);
+	void* (*read_call)(void *recv_buf);
 	void *arg;
 } client_base_t;
 
 struct client_base * tcp_client_init(const char *ip, int port);
-int tcp_client_start(struct client_base *, void* (*abnormal)(int cfd), void* (*read_call)(void **recv_buf));
-
+int tcp_client_start(struct client_base *, void* (*abnormal)(int cfd), void* (*read_call)(void *recv_buf));
+void tcp_client_end(struct client_base **);
+int tcp_client_closed(struct client_base*);
 #endif
 
 

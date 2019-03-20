@@ -85,10 +85,13 @@ void accept_cb(int fd, short events, void* arg) {
 	event_add(evt, NULL);
 }
 
-void test_free(char ** buf)
+
+
+void * read_call(void * arg)
 {
-	free(*buf);
-	*buf = NULL;
+	struct read_buf *rbuf = (struct read_buf *)arg;
+	rbuf->sbase->read_call(rbuf->cfd, rbuf->buf, rbuf->sbase);
+	return NULL;
 }
 
 void socket_read_cb(int fd, short events, void *arg) {
@@ -100,7 +103,6 @@ void socket_read_cb(int fd, short events, void *arg) {
 	int len = read(fd, &recv_apk, sizeof(struct apk_buf));
 	if ( len <= 0 ) {
 
-		printf("%s\n", "colse");
 		event_free(accept_evt->evt);
 		accept_evt->evt = NULL;
 		accept_evt->status = 0x00;
@@ -117,28 +119,23 @@ void socket_read_cb(int fd, short events, void *arg) {
 		accept_evt->recv_buf = (char*)malloc(recv_apk.size);
 		memset(accept_evt->recv_buf, 0x00, recv_apk.size);
 		accept_evt->status = 0x01;
-		printf("%s\n", "malloc");
 	}
 	memcpy(accept_evt->recv_buf + recv_apk.number * TCP_APK_SIZE, recv_apk.buf, TCP_APK_SIZE);
 	if (recv_apk.status == APK_END)
 	{
+
+		struct read_buf *rbuf = (struct read_buf*)malloc(sizeof(struct read_buf) + recv_apk.size);
+		memset(rbuf, 0x00, sizeof(struct read_buf) + recv_apk.size);
+		rbuf->sbase = sbaes;
+		rbuf->cfd = fd;
+		memcpy(rbuf->buf, accept_evt->recv_buf, recv_apk.size);
+		thread_add_job(sbaes->thread_pool, read_call, rbuf, sizeof(struct read_buf) + recv_apk.size, -1);
+		free(rbuf);
+		rbuf = NULL;
 		accept_evt->status = 0x00;
-		printf("%p--%s\n", accept_evt->recv_buf, accept_evt->recv_buf);
-		// char *str = "dddd";
-		char *buf = (char*)malloc(recv_apk.size + 1);
-		if (buf != NULL)
-		{
-			memset(buf, '\0', recv_apk.size + 1);
-			memcpy(buf, accept_evt->recv_buf, recv_apk.size);
-			//thread_add_job(sbaes->thread_pool, sbaes->read_call, (void**)&buf, -1, NULL);
-		} else {
-			printf("%s\n", "malloc error");
-		}
 		free(accept_evt->recv_buf);
 		accept_evt->recv_buf = NULL;
 		memcpy(sbaes->conencts_info + fd * sizeof(struct accepts_event), accept_evt, sizeof(struct accepts_event));
-
-
 	} else {
 		memcpy(sbaes->conencts_info + fd * sizeof(struct accepts_event), accept_evt, sizeof(struct accepts_event));
 
@@ -186,7 +183,9 @@ struct server_base* tcp_server_init(int port, int listen_num, int max_connect, v
 	return pserver;
 }
 
-int tcp_server_start(struct server_base*sbase, struct thread_pool *tpool, void* (*new_accept)(int cfd), void* (*abnormal)(int cfd), void* (*read_call)(void **recv_buf)) {
+int tcp_server_start(struct server_base*sbase, struct thread_pool *tpool, void* (*new_accept)(int cfd),
+                     void* (*abnormal)(int cfd),
+                     void* (*read_call)(int cfd, void * read_buf, struct server_base *base)) {
 	if (sbase == NULL) {
 		log_print("struct server_base is null");
 		return -1;
@@ -197,6 +196,39 @@ int tcp_server_start(struct server_base*sbase, struct thread_pool *tpool, void* 
 	sbase->read_call = read_call;
 	event_base_dispatch(sbase->base);
 	return 1;
+}
+
+void tcp_server_end(struct server_base**sbase)
+{
+	(*sbase)->close = 0x01;
+	for (int i = 0; i < (*sbase)->max_connect; ++i)
+	{
+		char sevnts[sizeof(struct accepts_event)] = {0x00};
+		memcpy(&sevnts, (*sbase)->conencts_info + i * sizeof(struct accepts_event), sizeof(struct accepts_event));
+		struct accepts_event * accept_evt = (struct accepts_event *)sevnts;
+		if (accept_evt->evt != NULL)
+		{
+			event_free(accept_evt->evt);
+			close(accept_evt->cfd);
+		}
+	}
+	free((*sbase)->conencts_info);
+	(*sbase)->conencts_info = NULL;
+	free(*sbase);
+	(*sbase) = NULL;
+
+}
+
+int tcp_server_closed(struct server_base*sbase, int fd)
+{
+	char sevnts[sizeof(struct accepts_event)] = {0x00};
+	memcpy(&sevnts, sbase->conencts_info + fd * sizeof(struct accepts_event), sizeof(struct accepts_event));
+	struct accepts_event * accept_evt = (struct accepts_event *)sevnts;
+	if (accept_evt->evt == NULL)
+	{
+		return 1;
+	}
+	return 0;
 }
 
 #else
@@ -210,8 +242,6 @@ struct client_base * tcp_client_init(const char *ipstr, int port)
 		log_print("socket fail");
 		return NULL;
 	}
-
-
 	//2.初始化服务器地址
 	bzero(&serveraddr, sizeof(serveraddr));
 	serveraddr.sin_family = AF_INET;
@@ -227,7 +257,7 @@ struct client_base * tcp_client_init(const char *ipstr, int port)
 	base->ip = (char*)ipstr;
 	base->port = port;
 	base->sfd = confd;
-
+	base->close = 0x00;
 	return base;
 }
 
@@ -239,6 +269,7 @@ void *client_read_thread(void *arg)
 		struct apk_buf recv_apk;
 		int len = recv(fd, &recv_apk, sizeof(struct apk_buf), 0);
 		if ( len <= 0 ) {
+			cbase->close = 0x01;
 			close(fd);
 			return NULL;
 		}
@@ -246,7 +277,7 @@ void *client_read_thread(void *arg)
 	}
 }
 
-int tcp_client_start(struct client_base *cbase, void* (*abnormal)(int cfd), void* (*read_call)(void **recv_buf))
+int tcp_client_start(struct client_base *cbase, void* (*abnormal)(int cfd), void* (*read_call)(void *recv_buf))
 {
 	if (cbase == NULL)
 	{
@@ -260,6 +291,17 @@ int tcp_client_start(struct client_base *cbase, void* (*abnormal)(int cfd), void
 	return cbase->sfd;
 }
 
+void tcp_client_end(struct client_base **cbase)
+{
+	close((*cbase)->sfd);
+	free(*cbase);
+	*cbase = NULL;
+}
+
+int tcp_client_closed(struct client_base* cbase)
+{
+	return  cbase->close;
+}
 
 #endif
 

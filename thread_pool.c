@@ -74,7 +74,7 @@ int thread_add_job(struct thread_pool *pool, void* (*callback_function)(void *ar
 
 	}
 	pthread->queue_num++;
-	printf("pthread->queue_num:%d\n", pthread->queue_num);
+	//printf("pthread->queue_num:%d\n", pthread->queue_num);
 	pthread_mutex_unlock(&(pthread->mutex));
 	pthread_cond_signal(&(pthread->cond));
 
@@ -123,7 +123,7 @@ void* thread_function(void* arg) {
 					pthread->queue_num--;
 				}
 			}
-			printf("close:%d\n", pthread->seq );
+			//printf("close:%d\n", pthread->seq );
 			pthread_mutex_unlock(&(pthread->mutex));
 			pthread_cond_signal(&(pthread->empty_cond));
 			pthread_exit(NULL);
@@ -134,7 +134,7 @@ void* thread_function(void* arg) {
 			pthread->job_head = pthread->job_head->next;
 			pthread->queue_num--;
 		}
-		printf("pthread->queue_num----------:%d\n", pthread->queue_num);
+		//printf("pthread->queue_num----------:%d\n", pthread->queue_num);
 		pthread_mutex_unlock(&(pthread->mutex));
 
 		if (job != NULL) {
