@@ -6,7 +6,6 @@
 
 int tcp_send(int fd, void *buf, int data_size)
 {
-	printf("tcp_send::%s\n", buf);
 	struct apk_buf apk = {0x00};
 	int send_size = sizeof(struct apk_buf);
 	apk.size = data_size;
@@ -20,7 +19,6 @@ int tcp_send(int fd, void *buf, int data_size)
 			memcpy(apk.buf, buf + i * TCP_APK_SIZE, TCP_APK_SIZE);
 			int status = send(fd, &apk, send_size, 0);
 			if (status < 0) {
-				log_print("send apk err2");
 				return status;
 			}
 		}
@@ -30,7 +28,6 @@ int tcp_send(int fd, void *buf, int data_size)
 		memcpy(apk.buf, buf + count * TCP_APK_SIZE, residue);
 		int status = send(fd, &apk, send_size, 0);
 		if (status < 0) {
-			log_print("send apk err1");
 			return status;
 		}
 	} else {
@@ -46,7 +43,6 @@ int tcp_send(int fd, void *buf, int data_size)
 			memcpy(apk.buf, buf + i * TCP_APK_SIZE, TCP_APK_SIZE);
 			int status = send(fd, &apk, send_size, 0);
 			if (status < 0) {
-				log_print("send apk erro3");
 				return status;
 			}
 		}
@@ -120,7 +116,13 @@ void socket_read_cb(int fd, short events, void *arg) {
 		memset(accept_evt->recv_buf, 0x00, recv_apk.size);
 		accept_evt->status = 0x01;
 	}
-	memcpy(accept_evt->recv_buf + recv_apk.number * TCP_APK_SIZE, recv_apk.buf, TCP_APK_SIZE);
+	if ((recv_apk.number + 1) * TCP_APK_SIZE < recv_apk.size)
+	{
+		memcpy(accept_evt->recv_buf + recv_apk.number * TCP_APK_SIZE, recv_apk.buf, TCP_APK_SIZE);
+	} else {
+		int residue = recv_apk.size - recv_apk.number * TCP_APK_SIZE;
+		memcpy(accept_evt->recv_buf + recv_apk.number * TCP_APK_SIZE, recv_apk.buf, residue);
+	}
 	if (recv_apk.status == APK_END)
 	{
 
@@ -273,11 +275,38 @@ void *client_read_thread(void *arg)
 			close(fd);
 			return NULL;
 		}
-		printf("%s\n", recv_apk.buf);
+		if (recv_apk.status == APK_CONFIRM)
+		{
+			continue;
+		}
+		if (cbase->recv_status == 0x00)
+		{
+			cbase->recv_buf = (char*)malloc(recv_apk.size);
+			memset(cbase->recv_buf, 0x00, recv_apk.size);
+			cbase->recv_status = 0x01;
+		}
+		if ((recv_apk.number + 1) * TCP_APK_SIZE < recv_apk.size)
+		{
+			memcpy(cbase->recv_buf + recv_apk.number * TCP_APK_SIZE, recv_apk.buf, TCP_APK_SIZE);
+		} else {
+			int residue = recv_apk.size - recv_apk.number * TCP_APK_SIZE;
+			memcpy(cbase->recv_buf + recv_apk.number * TCP_APK_SIZE, recv_apk.buf, residue);
+		}
+		if (recv_apk.status == APK_END)
+		{
+			if (cbase->thread_pool != NULL)
+			{
+				thread_add_job(cbase->thread_pool, cbase->read_call, cbase->recv_buf, recv_apk.size, -1);
+			}
+			free(cbase->recv_buf);
+			cbase->recv_buf = NULL;
+			cbase->recv_status = 0x00;
+		}
+
 	}
 }
 
-int tcp_client_start(struct client_base *cbase, void* (*abnormal)(int cfd), void* (*read_call)(void *recv_buf))
+int tcp_client_start(struct client_base *cbase, struct thread_pool *pool,  void* (*abnormal)(int cfd), void* (*read_call)(void *recv_buf))
 {
 	if (cbase == NULL)
 	{
@@ -286,6 +315,7 @@ int tcp_client_start(struct client_base *cbase, void* (*abnormal)(int cfd), void
 	}
 	cbase->abnormal = abnormal;
 	cbase->read_call = read_call;
+	cbase->thread_pool = pool;
 	pthread_t read_thread;
 	pthread_create(&read_thread, NULL, client_read_thread, (void*)cbase);
 	return cbase->sfd;

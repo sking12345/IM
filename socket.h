@@ -94,11 +94,13 @@ typedef struct client_base {
 	struct thread_pool *thread_pool;
 	void* (*abnormal)(int cfd);
 	void* (*read_call)(void *recv_buf);
+	int recv_status;
+	char * recv_buf;
 	void *arg;
 } client_base_t;
 
 struct client_base * tcp_client_init(const char *ip, int port);
-int tcp_client_start(struct client_base *, void* (*abnormal)(int cfd), void* (*read_call)(void *recv_buf));
+int tcp_client_start(struct client_base *, struct thread_pool *thread_pool, void* (*abnormal)(int cfd), void* (*read_call)(void *recv_buf));
 void tcp_client_end(struct client_base **);
 int tcp_client_closed(struct client_base*);
 #endif
