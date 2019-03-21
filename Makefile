@@ -1,6 +1,16 @@
 #makefile 
 #
 
+
+cc = xcrun -sdk iphoneos clang
+CPP = xcrun -sdk iphoneos clang
+AR = ar
+CFLAGS += -arch armv7 -mios-version-min=6.0  -march=armv7-a
+LDFLAGS += -arch armv7 -mios-version-min=6.0  -march=armv7-a  -Wl,  -Bsymbolic-functions -read_only_relocs suppress
+
+
+
+
 object = thread_pool.o socket.o log.o
 
 server:server.o $(object)
@@ -19,7 +29,7 @@ server.o: server.c
 
 thread_pool.o: thread_pool.c thread_pool.h
 	cc -c thread_pool.c
-	
+
 socket.o: socket.c socket.h
 	cc -c socket.c
 log.o: log.c log.h
