@@ -41,9 +41,6 @@ int tcp_send(int fd, void *, int size);
 #if COMPILE_TYPE == 0x00
 #include<event.h>
 
-
-
-
 typedef struct server_base {
 	int close;
 	int max_connect;
