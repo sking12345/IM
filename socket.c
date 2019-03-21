@@ -260,6 +260,7 @@ struct client_base * tcp_client_init(const char *ipstr, int port)
 	base->port = port;
 	base->sfd = confd;
 	base->close = 0x00;
+	base->recv_status = 0x00;
 	return base;
 }
 
