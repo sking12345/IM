@@ -2,14 +2,6 @@
 #
 
 
-cc = xcrun -sdk iphoneos clang
-CPP = xcrun -sdk iphoneos clang
-AR = ar
-CFLAGS += -arch armv7 -mios-version-min=6.0  -march=armv7-a
-LDFLAGS += -arch armv7 -mios-version-min=6.0  -march=armv7-a  -Wl,  -Bsymbolic-functions -read_only_relocs suppress
-
-
-
 
 object = thread_pool.o socket.o log.o
 
