@@ -4,8 +4,7 @@
 //https://www.cnblogs.com/wainiwann/p/7096245.html
 
 
-int tcp_send(int fd, void *buf, int data_size)
-{
+int tcp_send(int fd, void *buf, int data_size) {
 	struct apk_buf apk = {0x00};
 	int send_size = sizeof(struct apk_buf);
 	apk.size = data_size;
@@ -83,8 +82,7 @@ void accept_cb(int fd, short events, void* arg) {
 
 
 
-void * read_call(void * arg)
-{
+void * read_call(void * arg) {
 	struct read_buf *rbuf = (struct read_buf *)arg;
 	rbuf->sbase->read_call(rbuf->cfd, rbuf->buf, rbuf->sbase);
 	return NULL;
@@ -106,25 +104,23 @@ void socket_read_cb(int fd, short events, void *arg) {
 		close(fd);
 		return ;
 	}
-	if (recv_apk.status == APK_CONFIRM)
-	{
+	if (recv_apk.status == APK_CONFIRM) {
 		return;
 	}
-	if (accept_evt->status == 0x00)
-	{
+	printf("number:%d\n", recv_apk.number );
+	return;
+	if (accept_evt->status == 0x00) {
 		accept_evt->recv_buf = (char*)malloc(recv_apk.size);
 		memset(accept_evt->recv_buf, 0x00, recv_apk.size);
 		accept_evt->status = 0x01;
 	}
-	if ((recv_apk.number + 1) * TCP_APK_SIZE < recv_apk.size)
-	{
+	if ((recv_apk.number + 1) * TCP_APK_SIZE < recv_apk.size) {
 		memcpy(accept_evt->recv_buf + recv_apk.number * TCP_APK_SIZE, recv_apk.buf, TCP_APK_SIZE);
 	} else {
 		int residue = recv_apk.size - recv_apk.number * TCP_APK_SIZE;
 		memcpy(accept_evt->recv_buf + recv_apk.number * TCP_APK_SIZE, recv_apk.buf, residue);
 	}
-	if (recv_apk.status == APK_END)
-	{
+	if (recv_apk.status == APK_END) {
 
 		struct read_buf *rbuf = (struct read_buf*)malloc(sizeof(struct read_buf) + recv_apk.size);
 		memset(rbuf, 0x00, sizeof(struct read_buf) + recv_apk.size);
@@ -200,16 +196,13 @@ int tcp_server_start(struct server_base*sbase, struct thread_pool *tpool, void* 
 	return 1;
 }
 
-void tcp_server_end(struct server_base**sbase)
-{
+void tcp_server_end(struct server_base**sbase) {
 	(*sbase)->close = 0x01;
-	for (int i = 0; i < (*sbase)->max_connect; ++i)
-	{
+	for (int i = 0; i < (*sbase)->max_connect; ++i) {
 		char sevnts[sizeof(struct accepts_event)] = {0x00};
 		memcpy(&sevnts, (*sbase)->conencts_info + i * sizeof(struct accepts_event), sizeof(struct accepts_event));
 		struct accepts_event * accept_evt = (struct accepts_event *)sevnts;
-		if (accept_evt->evt != NULL)
-		{
+		if (accept_evt->evt != NULL) {
 			event_free(accept_evt->evt);
 			close(accept_evt->cfd);
 		}
@@ -221,21 +214,18 @@ void tcp_server_end(struct server_base**sbase)
 
 }
 
-int tcp_server_closed(struct server_base*sbase, int fd)
-{
+int tcp_server_closed(struct server_base*sbase, int fd) {
 	char sevnts[sizeof(struct accepts_event)] = {0x00};
 	memcpy(&sevnts, sbase->conencts_info + fd * sizeof(struct accepts_event), sizeof(struct accepts_event));
 	struct accepts_event * accept_evt = (struct accepts_event *)sevnts;
-	if (accept_evt->evt == NULL)
-	{
+	if (accept_evt->evt == NULL) {
 		return 1;
 	}
 	return 0;
 }
 
 #else
-struct client_base * tcp_client_init(const char *ipstr, int port)
-{
+struct client_base * tcp_client_init(const char *ipstr, int port) {
 
 	struct sockaddr_in serveraddr;
 	//1.创建一个socket
@@ -264,8 +254,7 @@ struct client_base * tcp_client_init(const char *ipstr, int port)
 	return base;
 }
 
-void *client_read_thread(void *arg)
-{
+void *client_read_thread(void *arg) {
 	struct client_base* cbase = (struct client_base*)arg;
 	int fd = cbase->sfd;
 	while (1) {
@@ -276,27 +265,22 @@ void *client_read_thread(void *arg)
 			close(fd);
 			return NULL;
 		}
-		if (recv_apk.status == APK_CONFIRM)
-		{
+		if (recv_apk.status == APK_CONFIRM) {
 			continue;
 		}
-		if (cbase->recv_status == 0x00)
-		{
+		if (cbase->recv_status == 0x00) {
 			cbase->recv_buf = (char*)malloc(recv_apk.size);
 			memset(cbase->recv_buf, 0x00, recv_apk.size);
 			cbase->recv_status = 0x01;
 		}
-		if ((recv_apk.number + 1) * TCP_APK_SIZE < recv_apk.size)
-		{
+		if ((recv_apk.number + 1) * TCP_APK_SIZE < recv_apk.size) {
 			memcpy(cbase->recv_buf + recv_apk.number * TCP_APK_SIZE, recv_apk.buf, TCP_APK_SIZE);
 		} else {
 			int residue = recv_apk.size - recv_apk.number * TCP_APK_SIZE;
 			memcpy(cbase->recv_buf + recv_apk.number * TCP_APK_SIZE, recv_apk.buf, residue);
 		}
-		if (recv_apk.status == APK_END)
-		{
-			if (cbase->thread_pool != NULL)
-			{
+		if (recv_apk.status == APK_END) {
+			if (cbase->thread_pool != NULL) {
 				thread_add_job(cbase->thread_pool, cbase->read_call, cbase->recv_buf, recv_apk.size, -1);
 			}
 			free(cbase->recv_buf);
@@ -307,10 +291,8 @@ void *client_read_thread(void *arg)
 	}
 }
 
-int tcp_client_start(struct client_base *cbase, struct thread_pool *pool,  void* (*abnormal)(int cfd), void* (*read_call)(void *recv_buf))
-{
-	if (cbase == NULL)
-	{
+int tcp_client_start(struct client_base *cbase, struct thread_pool *pool,  void* (*abnormal)(int cfd), void* (*read_call)(void *recv_buf)) {
+	if (cbase == NULL) {
 		log_print("struct client_base is NULL");
 		return -1;
 	}
@@ -322,15 +304,13 @@ int tcp_client_start(struct client_base *cbase, struct thread_pool *pool,  void*
 	return cbase->sfd;
 }
 
-void tcp_client_end(struct client_base **cbase)
-{
+void tcp_client_end(struct client_base **cbase) {
 	close((*cbase)->sfd);
 	free(*cbase);
 	*cbase = NULL;
 }
 
-int tcp_client_closed(struct client_base* cbase)
-{
+int tcp_client_closed(struct client_base* cbase) {
 	return  cbase->close;
 }
 
