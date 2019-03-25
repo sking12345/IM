@@ -28,11 +28,10 @@ typedef struct sockaddr SA;
 
 //数据包分别结构
 typedef struct apk_buf {
-	int status;
-	int number;
-	char only_number[16];	//数据唯一编号,struct send_queue 的编号一样,用于服务器确认接受到的什么数据
-	int verify;
 	int size;
+	int number;
+	int status;
+	char only_number[16];	//数据唯一编号,struct send_queue 的编号一样,用于服务器确认接受到的什么数据
 	char buf[TCP_APK_SIZE];
 } apk_buf_t;
 

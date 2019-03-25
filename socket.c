@@ -48,8 +48,6 @@ int tcp_send(int fd, void *buf, int data_size) {
 	}
 	return 0;
 }
-
-
 #if COMPILE_TYPE == 0x00
 void accept_cb(int fd, short events, void* arg) {
 
@@ -107,8 +105,9 @@ void socket_read_cb(int fd, short events, void *arg) {
 	if (recv_apk.status == APK_CONFIRM) {
 		return;
 	}
-	printf("number:%d\n", recv_apk.number );
-	return;
+#if TCP_DATA_COMPLETE == 0x00
+
+#else
 	if (accept_evt->status == 0x00) {
 		accept_evt->recv_buf = (char*)malloc(recv_apk.size);
 		memset(accept_evt->recv_buf, 0x00, recv_apk.size);
@@ -138,6 +137,9 @@ void socket_read_cb(int fd, short events, void *arg) {
 		memcpy(sbaes->conencts_info + fd * sizeof(struct accepts_event), accept_evt, sizeof(struct accepts_event));
 
 	}
+#endif
+
+
 
 }
 
@@ -186,6 +188,16 @@ int tcp_server_start(struct server_base*sbase, struct thread_pool *tpool, void* 
                      void* (*read_call)(int cfd, void * read_buf, struct server_base *base)) {
 	if (sbase == NULL) {
 		log_print("struct server_base is null");
+		return -1;
+	}
+	if (tpool == NULL)
+	{
+		log_print("plese init thread_pool");
+		return -1;
+	}
+	if (read_call == NULL)
+	{
+		log_print("plese input read_call");
 		return -1;
 	}
 	sbase->thread_pool = tpool;
