@@ -34,6 +34,16 @@ typedef struct apk_buf {
 	char only_number[16];	//数据唯一编号,struct send_queue 的编号一样,用于服务器确认接受到的什么数据
 	char buf[TCP_APK_SIZE];
 } apk_buf_t;
+typedef struct read_buf
+{
+	int cfd;
+#if COMPILE_TYPE == 0x00
+	struct server_base * base;
+#else
+	struct client_base *base;
+#endif
+	char buf[0];
+} read_buf_t;
 
 int tcp_send(int fd, void *, int size);
 
@@ -62,12 +72,7 @@ typedef struct accepts_event {
 	char *recv_buf;
 } server_accept_t;
 
-typedef struct read_buf
-{
-	int cfd;
-	struct server_base * sbase;
-	char buf[0];
-} read_buf_t;
+
 
 
 void accept_cb(int fd, short events, void* arg);
@@ -89,14 +94,14 @@ typedef struct client_base {
 	int close; //连接状态
 	struct thread_pool *thread_pool;
 	void* (*abnormal)(int cfd);
-	void* (*read_call)(void *recv_buf);
+	void* (*read_call)(int fd, void *recv_buf, struct client_base*cbase);
 	int recv_status;
 	char * recv_buf;
 	void *arg;
 } client_base_t;
 
 struct client_base * tcp_client_init(const char *ip, int port);
-int tcp_client_start(struct client_base *, struct thread_pool *thread_pool, void* (*abnormal)(int cfd), void* (*read_call)(void *recv_buf));
+int tcp_client_start(struct client_base *, struct thread_pool *thread_pool, void* (*abnormal)(int cfd), void* (*read_call)(int fd, void *recv_buf, struct client_base*cbase));
 void tcp_client_end(struct client_base **);
 int tcp_client_closed(struct client_base*);
 #endif

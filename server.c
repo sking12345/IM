@@ -5,26 +5,23 @@
 // #include "log.h"
 
 
+
 void * work1(int cfd, void * read_buf, struct server_base *sbase)
 {
-	printf("%s\n", (char*)read_buf);
-	char *buf = "ddd";
-	if (tcp_server_closed(sbase, cfd) <= 0)
-	{
-		tcp_send(cfd, (void*)buf, strlen(buf) + 1);
-	}
 
+	// printf("%s\n", (char*)read_buf);
+	// char *buf = "ddd";
+	// if (tcp_server_closed(sbase, cfd) <= 0)
+	// {
+	// 	tcp_send(cfd, (void*)buf, strlen(buf) + 1);
+	// }
+	const char * file_name = "/Users/mac/Desktop/xxx1.yuv";
+	printf("xxxx_len::%ld\n", strlen((char*)read_buf));
+	int yuv_fd = open(file_name, O_RDWR | O_CREAT | O_APPEND, 0777);
+	write(yuv_fd, read_buf, strlen(read_buf));
+	close(yuv_fd);
 	return NULL;
 }
-
-// void *work(void *arg)
-// {
-// 	// struct accepts_event * accept = (struct accepts_event*)arg;;
-// 	// printf("work_buf1: %s\n", accept->recv_buf);
-// 	struct read_buf *rbuf = (struct read_buf*)arg;
-// 	printf("rbuf->buf:%d\n", rbuf->buf);
-// 	return NULL;
-// }
 
 
 
