@@ -66,14 +66,7 @@ int curlPost(const char *url, const char *data, void *user_parame, void* (*callb
     }
 }
 
-void* test(void *buffer, void*user_parame) {
-    printf("%s\n", buffer);
-    return NULL;
-}
 
-int main() {
-    curlGet("127.0.0.1", "ddd", test);
-}
 
 
 
