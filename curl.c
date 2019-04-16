@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <stdlib.h>
 
 typedef struct curl_call_parame {
     void* (*callback_function)(void *buffer, void*user_parame);
@@ -14,7 +15,12 @@ typedef struct curl_call_parame {
 size_t process_data(void *buffer, size_t size, size_t nmemb, void *user_p) {
     struct curl_call_parame  *user_parame = ( struct curl_call_parame*)user_p;
     if (user_parame->callback_function != NULL) {
-        (*(user_parame->callback_function))(buffer, user_parame->user_parame);
+        char *buf = (char*)malloc(nmemb);
+        memset(buf, 0x00, nmemb);
+        memcpy(buf, buffer, nmemb);
+        (*(user_parame->callback_function))(buf, user_parame->user_parame);
+        free(buf);
+        buf = NULL;
     }
     return 0;
 }
@@ -68,7 +74,6 @@ void* test(void *buffer, void*user_parame) {
 int main() {
     curlGet("127.0.0.1", "ddd", test);
 }
-
 
 
 
