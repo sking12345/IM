@@ -104,15 +104,27 @@ void socket_read_cb(int fd, short events, void *arg) {
 		close(fd);
 		return ;
 	}
-	printf("len:%d\n", len);
+	printf("len:%d,size:%d\n", len, recv_apk.size);
 	if (recv_apk.status == APK_CONFIRM) {
 		return;
 	}
+	int rbuf_size = TCP_APK_SIZE;
+	if (recv_apk.size < (recv_apk.number + 1) * TCP_APK_SIZE)
+	{
+		rbuf_size = recv_apk.size % TCP_APK_SIZE;
+	}
+	printf("rbuf_size:%d\n", rbuf_size);
+	const char * file_name = "/Users/mac/Desktop/xxx1.pcm";
+	int yuv_fd = open(file_name, O_RDWR | O_CREAT | O_APPEND, 0777);
+	write(yuv_fd, recv_apk.buf, rbuf_size);
+	close(yuv_fd);
+
+	return;
 #if TCP_DATA_COMPLETE == 0x00	//不用等待完整数据
 
 
-	int residual = recv_apk.size - (recv_apk.number + 1) * TCP_APK_SIZE;
-	int rbuf_size = TCP_APK_SIZE;
+	// int residual = recv_apk.size - (recv_apk.number + 1) * TCP_APK_SIZE;
+	// int rbuf_size = TCP_APK_SIZE;
 	if (recv_apk.size < (recv_apk.number + 1) * TCP_APK_SIZE)
 	{
 		rbuf_size = recv_apk.size % TCP_APK_SIZE;

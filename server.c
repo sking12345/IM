@@ -15,7 +15,7 @@ void * work1(int cfd, void * read_buf, struct server_base *sbase)
 	// {
 	// 	tcp_send(cfd, (void*)buf, strlen(buf) + 1);
 	// }
-	const char * file_name = "/Users/mac/Desktop/xxx1.yuv";
+	const char * file_name = "/Users/mac/Desktop/xxx1.acc";
 	printf("xxxx_len::%ld\n", strlen((char*)read_buf));
 	int yuv_fd = open(file_name, O_RDWR | O_CREAT | O_APPEND, 0777);
 	write(yuv_fd, read_buf, strlen(read_buf));
