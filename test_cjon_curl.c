@@ -21,16 +21,50 @@ void* test(void *buffer, void*user_parame) {
 	if (!root) {
 		printf("Error before: [%s]\n", cJSON_GetErrorPtr());
 	} else {
-		printJson(root);
 		cJSON * item = NULL;//cjson对象
-		item = cJSON_GetObjectItem(root, "xxx");//
+		item = cJSON_GetObjectItem(root, "xx");//
 		printf("%s\n", item->valuestring);
 	}
 	return NULL;
 }
 
-
-
 int main() {
-	curlGet("127.0.0.1", "ddd", test);
+	char * str = NULL;
+	// curl_get("www.phpframe.com", "ddd", NULL, &str);
+	// printf("%s\n", str);
+	// cJSON * root  = cJSON_Parse(str);
+	// cJSON * item = NULL;//cjson对象
+	// item = cJSON_GetObjectItem(root, "xx");//
+	// printf("%s\n", item->valuestring);
+	// curl_end(&str);
+	// curl_post("http://www.phpframe.com/project/?ctl=index&act=login", "&username=admin&password=123456", NULL, NULL, &str);
+	// printf("%s\n", str);
+	// cJSON * root  = cJSON_Parse(str);
+	// cJSON * item = NULL;//cjson对象
+	// item = cJSON_GetObjectItem(root, "token");//
+	// char *token = (char*)malloc(strlen(item->valuestring) + 1);
+	// memset(token, '\0', strlen(item->valuestring) + 1);
+	// memcpy(token, item->valuestring, strlen(item->valuestring));
+	// printf("tken:%s\n", token);
+	// curl_end(&str);
+
+	curl_get("http://www.phpframe.com/project/?ctl=admin&act=index&token=test1419oxmxTYwwVCQYKn929uZR", NULL, NULL, &str);
+	printf("%s\n", str);
+	curl_end(&str);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
